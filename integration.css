@@ -48,6 +48,8 @@ html{scroll-behavior:auto;scroll-padding-top:112px}body{background:var(--bg);fon
 .js .planet-content .orbit-unit[data-orbit-state=waiting]{pointer-events:none}
 .js .planet-content .orbit-unit[data-orbit-state=reading]{will-change:auto}
 .planet-paused .planet-content .orbit-unit[data-orbit-state]{opacity:1!important;transform:none!important;will-change:auto}
+/* Keep the planet and emerging text free of decorative rings and trails. */
+.planet-stage :is(.orbit-lines,.orbit-thread,.orbit-source){display:none}
 .orbit-thread{
   position:absolute;inset:0;width:100%;height:100%;
   overflow:visible;pointer-events:none;z-index:2;
