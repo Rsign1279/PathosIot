@@ -4,8 +4,8 @@
 .foot-brand .pathos-iot-brand .brand-logo{width:160px;height:auto;aspect-ratio:178/130}
 .study-nav .pathos-iot-brand .brand-logo,.page-nav .pathos-iot-brand .brand-logo{width:184px;height:46px}
 .orbit-still:before,.orbit-still:after{content:'';position:absolute;inset:0;pointer-events:none;mask:url('assets/brand/pathos-iot-engraving.svg') center 35%/72% 72% no-repeat;-webkit-mask:url('assets/brand/pathos-iot-engraving.svg') center 35%/72% 72% no-repeat}
-.orbit-still:before{background:rgba(0,0,0,.68);transform:translate(1px,-1px)}
-.orbit-still:after{background:rgba(232,212,165,.16);transform:translate(-1px,1px);mix-blend-mode:soft-light}
+.orbit-still:before{background:rgba(0,0,0,.72);transform:translate(1px,-1px)}
+.orbit-still:after{background:linear-gradient(145deg,rgba(207,171,79,.48),rgba(157,121,39,.4) 45%,rgba(73,56,21,.28));transform:translate(-1px,1px)}
 @media(max-width:1199px){.nav .pathos-iot-brand .brand-logo{width:168px;height:42px}}
 @media(max-width:640px){.nav .pathos-iot-brand .brand-logo{width:160px;height:40px}.study-nav .pathos-iot-brand .brand-logo,.page-nav .pathos-iot-brand .brand-logo{width:150px;height:38px}.foot-brand .pathos-iot-brand .brand-logo{width:148px}}
 @media(max-width:360px){.nav .pathos-iot-brand .brand-logo{width:132px;height:33px}.study-nav .pathos-iot-brand .brand-logo,.page-nav .pathos-iot-brand .brand-logo{width:132px;height:33px}}

@@ -10,7 +10,8 @@ const svg=(viewBox,body,title='Pathos IoT')=>`<svg xmlns="http://www.w3.org/2000
 const stacked=svg('40 62 178 130',mark()+wordmark());
 const horizontal=svg('0 0 224 56',`<g transform="translate(2 3) scale(.78) translate(-104 -69)">${mark()}</g><g transform="translate(61 12) scale(.96) translate(-47 -147)">${wordmark(gold,gold,true)}</g>`);
 const emblem=svg('100 65 62 70',mark());
-// The planet gives the traveling narrative a clear band between emblem/name.
-const mask=svg('40 40 178 178',mark('#fff')+'<g transform="translate(0 17)">'+wordmark('#fff','#fff')+'</g>');
+// A padded, square relief of the supplied emblem stays legible on the small
+// mobile sphere. The wordmark remains in the page's navigation and footer.
+const mask=svg('88 58 84 84',mark('#fff'));
 const icon=(rounded=true)=>svg('0 0 96 96',`<rect width="96" height="96" rx="${rounded?20:0}" fill="#10100e"/><g transform="translate(24 20) scale(.9) translate(-104 -69)">${mark()}</g>`);
 module.exports={gold,markPath,mark,wordmark,svg,stacked,horizontal,emblem,mask,icon};

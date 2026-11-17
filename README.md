@@ -96,10 +96,13 @@ full-width page. Pause and reduced-motion preference expose every word
 immediately. Keyboard focus settles interactive content. No nested scroll
 container or forced snapping is used. Fonts are served locally.
 
-The engraving adds a 7.5 KB optional packed relief map. It loads independently
-of the sphere, follows its scroll-driven rotation and triggers one redraw.
-Missing WebGL retains an etched-logo CSS fallback. Branding changes preserve
-original media, technical model identifiers and the archived content baseline.
+The engraving uses the supplied emblem, enlarged for mobile, with a recessed
+bevel and a muted yellow mineral finish that shares the stone's light and grain.
+Its 5.5 KiB optional packed relief map loads independently of the sphere, follows
+its scroll-driven rotation and triggers one redraw. The emblem naturally turns
+out of view on the far side. Missing WebGL retains a warm etched-logo CSS fallback.
+Branding changes preserve original media, technical model identifiers and the
+archived content baseline.
 
 To rebuild the brand assets, install `@resvg/resvg-js` outside this site in
 `../brand-tools`, then run `node deliverables/build-brand.cjs`. This development
@@ -127,6 +130,12 @@ The motion suite loads the actual production math and controller in a small
 fake-document harness. It checks forward/reverse phases, paired row spacing,
 surface typography, idle scheduling, pause, reduced motion, focus, keyboard
 signals, resize coalescing, deep jumps and the shared renderer fallback.
+
+With Playwright available, `node deliverables/verify-planet-browser.cjs` checks
+the real engraving shader's pixels, reversible rotation, foreshortening and
+far-side occlusion, then exercises both passages and graphics context recovery
+at desktop and mobile widths. Serve the page on port 3000 first, or set
+`PATHOS_QA_URL`; `PATHOS_CHROMIUM_PATH` optionally selects a browser executable.
 
 With Playwright available to Node, `node deliverables/verify-hardware-browser.cjs`
 checks real native-resolution rendering, chapter seeking, 360 and zoom, idle

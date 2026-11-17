@@ -26,25 +26,28 @@ export async function createPlanet(canvas) {
       // RG stores the cut's tangent normal; B stores recessed cavity depth.
       float longitude=atan(q.x,q.z),latitude=asin(clamp(q.y,-1.,1.));
       float around=atan(sin(longitude+.35),cos(longitude+.35));
-      vec2 engravingUv=vec2(around/1.65+.5,(latitude-.30)/1.65+.5);
+      vec2 engravingUv=vec2(around/1.55+.5,(latitude-.30)/1.55+.5);
       float stampBounds=step(0.,engravingUv.x)*step(engravingUv.x,1.)*step(0.,engravingUv.y)*step(engravingUv.y,1.);
-      float cutEdge=0.;
+      float cutEdge=0.,cutDepth=0.;
       if(uEngraved>.5&&stampBounds>.5){
         vec3 cut=texture2D(uEngraving,engravingUv).rgb;
         vec2 relief=(cut.rg*255.-128.)/127.;
-        cutEdge=length(relief);
+        cutEdge=length(relief);cutDepth=cut.b;
         vec3 tangent=toView(vec3(cos(longitude),0.,-sin(longitude)),a);
         vec3 north=toView(vec3(-sin(latitude)*sin(longitude),cos(latitude),-sin(latitude)*cos(longitude)),a);
         normal=normalize(normal*sqrt(max(.02,1.-dot(relief,relief)))+tangent*relief.x+north*relief.y);
-        // Inward bevels catch the same light. Occluded floors keep the stone
-        // grain and veins instead of introducing a painted or emissive decal.
-        material*=1.-cut.b*.55;
+        // A muted yellow mineral finish sits inside the cut. Stone variation
+        // remains visible, and the recessed floor receives the same light as
+        // the sphere: no flat overlay or emissive color in the dark hemisphere.
+        vec3 inlay=vec3(.66,.47,.14)*(.66+terrain*.34)*(.86+veins*.14);
+        material=mix(material,inlay,cutDepth*.72);
+        material*=1.-cutDepth*.28;
       }
       vec3 light=normalize(vec3(.9,.55,.65));
       float diffuse=max(dot(normal,light),0.);float terminator=smoothstep(-.16,.8,dot(n,light));
       vec3 col=material*(.07+.96*diffuse)*terminator;
       float bevelGlint=pow(max(dot(normal,normalize(light+vec3(0.,0.,1.))),0.),24.);
-      col+=vec3(.84,.79,.67)*bevelGlint*cutEdge*.20*terminator;
+      col+=vec3(.88,.70,.30)*bevelGlint*(cutEdge*.28+cutDepth*.035)*terminator;
       col+=material*.028;float rim=pow(1.-max(n.z,0.),3.5)*max(dot(n,light),0.);
       col+=vec3(.76,.68,.49)*rim*.26;
       float grain=hash(vec3(gl_FragCoord.xy,11.))-.5;col+=grain*.016;
@@ -59,8 +62,10 @@ export async function createPlanet(canvas) {
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); throw new Error('Planet shader unavailable'); }
     compiled.push(shader);return shader;
   };
-  let program,buffer,texture,engraving;
-  const cleanup=()=>{if(engraving)gl.deleteTexture(engraving);if(texture)gl.deleteTexture(texture);if(buffer)gl.deleteBuffer(buffer);if(program)gl.deleteProgram(program);};
+  let program,buffer,texture,engraving,lost=false;
+  // A lost context has already discarded these handles. After restoration
+  // they belong to the old context and must never be deleted in the new one.
+  const cleanup=()=>{if(lost)return;if(engraving)gl.deleteTexture(engraving);if(texture)gl.deleteTexture(texture);if(buffer)gl.deleteBuffer(buffer);if(program)gl.deleteProgram(program);};
   try {
     program = gl.createProgram();
     const vs = compile(gl.VERTEX_SHADER, vertex), fs = compile(gl.FRAGMENT_SHADER, fragment);
@@ -87,7 +92,7 @@ export async function createPlanet(canvas) {
   gl.uniform1i(gl.getUniformLocation(program,'uEngraving'),1);
   const engraved=gl.getUniformLocation(program,'uEngraved');gl.uniform1f(engraved,0);
   const rotation = gl.getUniformLocation(program, 'uRotation'), signal = gl.getUniformLocation(program, 'uSignal');
-  let width=0, lost=false, destroyed=false, impression=null, quality=matchMedia('(max-width:720px)').matches?1.25:1.5;
+  let width=0, destroyed=false, impression=null, quality=matchMedia('(max-width:720px)').matches?1.25:1.5;
   const render = (angle=0, activeSignal=.5) => {
     if (lost||destroyed) return;
     const side=Math.max(1,Math.round(canvas.clientWidth*Math.min(devicePixelRatio||1,quality)));
@@ -112,5 +117,5 @@ export async function createPlanet(canvas) {
     gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,gl.BROWSER_DEFAULT_WEBGL);
     gl.uniform1f(engraved,1);impression=null;canvas.dispatchEvent(new CustomEvent('planetchange'));
   }).catch(()=>{impression=null;});
-  return {render,lowerQuality(){quality=Math.max(.8,quality-.25);},destroy(){destroyed=true;lost=true;if(impression)impression.src='';impression=null;canvas.removeEventListener('webglcontextlost',onLost);canvas.removeEventListener('webglcontextrestored',onRestored);cleanup();}};
+  return {render,lowerQuality(){quality=Math.max(.8,quality-.25);},destroy(){destroyed=true;if(impression)impression.src='';impression=null;canvas.removeEventListener('webglcontextlost',onLost);canvas.removeEventListener('webglcontextrestored',onRestored);cleanup();lost=true;}};
 }

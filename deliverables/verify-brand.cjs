@@ -140,8 +140,10 @@ async function lifecycleChecks(){
   check(pending.images[1].src===''&&pending.calls.length===pendingCount&&pending.events.length===0,'Late map completion after destroy cannot upload or wake an obsolete canvas');freed(pending,'Destroy during optional loading frees all resources');
 
   const lost=harness(),lostPlanet=await lost.start();let prevented=false;lost.state.lost=true;lost.canvas.dispatchEvent({type:'webglcontextlost',preventDefault(){prevented=true;}});const lostCount=lost.calls.length;lost.images[1].resolve();await flush();lostPlanet.render(9);
-  check(prevented&&!lost.classes.has('has-webgl')&&lost.calls.length===lostCount&&!lost.events.includes('planetchange'),'Context loss exposes the fallback and prevents optional upload or drawing');lost.canvas.dispatchEvent({type:'webglcontextrestored'});
-  check(lost.events.includes('planetrestore'),'Context restoration requests reinitialization from the owning scheduler');lostPlanet.destroy();freed(lost,'Lost context cleanup releases its resources');
+  check(prevented&&!lost.classes.has('has-webgl')&&lost.calls.length===lostCount&&!lost.events.includes('planetchange'),'Context loss exposes the fallback and prevents optional upload or drawing');
+  const deletedBeforeRestore=callsOf(lost,'delete').length;lost.state.lost=false;lost.canvas.dispatchEvent({type:'webglcontextrestored'});
+  check(lost.events.includes('planetrestore'),'Context restoration requests reinitialization from the owning scheduler');lostPlanet.destroy();
+  check(callsOf(lost,'delete').length===deletedBeforeRestore&&lost.listeners.size===0,'Destroyed lost renderer removes listeners without deleting handles already discarded by the old context');
 
   for(const [label,options] of [['missing WebGL',{noGL:true}],['vertex compile failure',{shaderFail:1}],['fragment compile failure',{shaderFail:2}],['link failure',{linkFail:true}],['missing base texture',{photoFail:true}]]){
     const item=harness(options);check(await item.start()===null,`${label}: optional illustration fails safely`);freed(item,`${label}: partial allocations are released`);
