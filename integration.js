@@ -94,7 +94,7 @@ function updateGroup(group,y){
     group.links.forEach((link,i)=>{if(i===index)link.setAttribute('aria-current','step');else link.removeAttribute('aria-current');});
   }
   const current=group.bounds[index],within=clamp((focus-current.top)/Math.max(1,current.height));
-  group.bar.style.transform='scaleX('+((index+within)/group.chapters.length)+')';
+  if(group.bar)group.bar.style.transform='scaleX('+((index+within)/group.chapters.length)+')';
   const angle=angleAt(scroll,group.top,group.base,rate);
   if(!paused)group.angle=angle;
   group.element.dataset.orbitAngle=group.angle.toFixed(5);

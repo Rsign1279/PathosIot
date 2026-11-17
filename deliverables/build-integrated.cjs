@@ -27,7 +27,6 @@ const groups = [
   ]}
 ];
 const stage = group => `<aside class="planet-stage" aria-label="${group.label}">
-  <div class="planet-stage-heading"><span class="orbit-dot" aria-hidden="true"></span><span>${group.label}</span></div>
   <div class="orbit-object" aria-hidden="true">
     <svg class="orbit-lines" viewBox="0 0 1000 1000"><g fill="none" stroke="currentColor"><ellipse cx="500" cy="500" rx="477" ry="212" transform="rotate(-28 500 500)"/><ellipse cx="500" cy="500" rx="435" ry="322" transform="rotate(35 500 500)" stroke-dasharray="1 9"/><circle cx="500" cy="500" r="360" opacity=".25"/></g><g fill="currentColor"><circle cx="850" cy="285" r="4"/><circle cx="150" cy="712" r="3"/></g></svg>
     <div class="planet-surface"><div class="orbit-still"></div></div>
@@ -35,9 +34,6 @@ const stage = group => `<aside class="planet-stage" aria-label="${group.label}">
   </div>
   <svg class="orbit-thread" aria-hidden="true"><path class="orbit-surface-trace"/><path class="orbit-thread-path"/></svg><span class="orbit-source" aria-hidden="true"></span>
   <div class="planet-stage-caption"><span class="planet-chapter-count">01 / 06</span><h2 class="planet-chapter-title">${group.chapters[0][1]}</h2><p class="planet-chapter-note">${group.chapters[0][2]}</p></div>
-  <span class="planet-scroll-cue" aria-hidden="true">Scroll to unfold <span>↓</span></span>
-  <nav class="planet-chapter-links" aria-label="${group.label}: chapters">${group.chapters.map(([id,label],i)=>`<a href="#${id}" aria-label="Chapter ${i+1}: ${label}"${i===0?' aria-current="step"':''}><span>0${i+1}</span><span>${label}</span></a>`).join('')}</nav>
-  <div class="orbit-progress" aria-hidden="true"><span></span></div>
 </aside>`;
 
 for (const group of groups) {
@@ -68,7 +64,7 @@ html=html.replace('<form class="contact-form" id="contactForm" action="https://f
 const importerStart=html.indexOf('    <script type="module">',html.indexOf('src="hero.js"'));
 const importerEnd=html.indexOf('</script>',importerStart)+9;
 if(importerStart<0)throw new Error('Original hardware importer missing');
-html=html.slice(0,importerStart)+'    <script type="module" src="prototype-loader.js"></script>\n    <script type="module" src="integration.js"></script>\n    <noscript><style>.planet-motion{display:none}.planet-chapter-links{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>'+html.slice(importerEnd);
+html=html.slice(0,importerStart)+'    <script type="module" src="prototype-loader.js"></script>\n    <script type="module" src="integration.js"></script>\n    <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>'+html.slice(importerEnd);
 html=applyBrand(html);
 fs.writeFileSync(path.join(root,'index.html'),html);
 
