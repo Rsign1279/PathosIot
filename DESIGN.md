@@ -1,5 +1,15 @@
 # Pathos IoT design record
 
+## Hardware edges and lossless loading frame · November 16, 2026
+
+The hardware renderer retains MSAA on every device and raises oblique texture
+filtering to the GPU-supported maximum up to 16×. Its Full HD picture floor,
+8 Mi pixel ceiling, lazy preparation and offscreen release remain. A native
+1920 × 1080 first-frame render replaces the old lossy loading still. It uses
+lossless WebP with a pixel-exact check against the rendered crop. Removing the
+poster crossfade avoids blending two different poses during scroll. No film
+timing, model geometry or page content changes.
+
 ## Full HD hardware picture · November 16, 2026
 
 The hardware rig now has a 1920 × 1080 picture minimum even on 1× displays.

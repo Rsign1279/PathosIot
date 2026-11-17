@@ -1,4 +1,4 @@
-# Pathos IoT — integrated original + planetary story
+# Pathos IoT
 
 The founder's complete original landing page, with its 19 sections and
 interactive experiences retained. The new planetary narrative applies only
@@ -8,13 +8,17 @@ The standalone planetary redesign is preserved on `main` in
 [Rsign1279/Pathos-landing-2](https://github.com/Rsign1279/Pathos-landing-2),
 at commit `df2831c`. Its production deployment is
 [pathos-landing-2.vercel.app](https://pathos-landing-2.vercel.app/).
-This integrated edition is on `integrate/original-planet-story`.
+The editable integrated edition is on `main` in
+[Rsign1279/PathosIot](https://github.com/Rsign1279/PathosIot).
 
 ## Run
 
-No installation or build is needed to serve the checked-in page:
+Clone the source, then serve the checked-in page. No installation or build
+is needed:
 
 ```sh
+git clone https://github.com/Rsign1279/PathosIot.git
+cd PathosIot
 python -m http.server 3000 --bind 127.0.0.1
 ```
 
@@ -63,12 +67,18 @@ commit `6cfb566` so content preservation is directly auditable.
 - `hardware-quality.js`: gives the actual Blender picture a 1920 × 1080
   minimum, measured inside its letterboxed view, while retaining sharper native
   density. Extreme drawing buffers remain bounded to 8 Mi pixels and the GPU's
-  dimension limit. Slow frames never reduce resolution. When supersampling
-  already smooths the displayed picture, redundant MSAA buffers are avoided.
+  dimension limit. Slow frames never reduce resolution. Antialiasing stays
+  enabled for fine wires and pin rows, with up to 16× anisotropic filtering
+  on the laptop's oblique display textures.
   Large drawing buffers are released when hidden or offscreen and restored
   before the study returns; the model stays ready without another download.
 - `hero.js` and `film.js`: preserve the real films, with deferred loading,
   visibility pauses, controls, and reduced-motion alternatives.
+- `assets/pathos-hardware-poster.webp`: a native 1920 × 1080 lossless render
+  of the original film's first frame. It switches directly to the ready 3D
+  image without a crossfade that could ghost moving parts. Rebuild it with
+  `node deliverables/build-hardware-poster.cjs` when Playwright and Python
+  with Pillow are available in the development environment.
 
 Original headings travel across the marble surface, then unroll into their
 reserved reading positions. Paired entries share a row trajectory; later

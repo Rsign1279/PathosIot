@@ -33,5 +33,17 @@ test(source.includes('renderer.setSize(1, 1, false)')&&source.includes('if (!ren
 test(read('prototype-loader.js').includes("rootMargin:'100% 0px'"),'Model preparation begins one viewport ahead');
 test(source.includes("PATHOS dashboard • inset rounded window")&&source.includes('PATHOS_ROOT__static'),'Original model lookup names survive');
 test(source.includes('maxRenderDimension, film.w, film.h'),'Allocation uses actual Blender picture dimensions rather than the whole viewport');
-test(source.includes('planned.ratio / native < 1.5'),'Sufficient supersampling avoids stacking an additional MSAA buffer');
+test(/new THREE\.WebGLRenderer\(\{\s*antialias:\s*true\b/.test(source),'Thin rig details retain edge antialiasing on desktop and mobile');
+const poster=fs.readFileSync(path.join(root,'assets/pathos-hardware-poster.webp'));
+test(poster.toString('ascii',0,4)==='RIFF'&&poster.toString('ascii',8,12)==='WEBP','Hardware loading poster is a native WebP asset');
+let posterWidth=0,posterHeight=0,lossless=false;
+for(let offset=12;offset+8<=poster.length;){
+ const tag=poster.toString('ascii',offset,offset+4),size=poster.readUInt32LE(offset+4),start=offset+8;
+ if(tag==='VP8X'){posterWidth=poster.readUIntLE(start+4,3)+1;posterHeight=poster.readUIntLE(start+7,3)+1;}
+ if(tag==='VP8L'){const bits=poster.readUInt32LE(start+1);posterWidth=(bits&0x3fff)+1;posterHeight=((bits>>>14)&0x3fff)+1;lossless=true;}
+ offset=start+size+(size%2);
+}
+test(posterWidth===1920&&posterHeight===1080,'Loading and fallback poster has real 1920 x 1080 source pixels');
+test(lossless,'Hardware poster uses lossless compression rather than a soft lossy preview');
+test(poster.length<1536*1024,'Lossless HD poster stays within a 1.5 MiB transfer budget');
 console.log(`${checks}/${checks} hardware resolution, resource and playback policy checks passed.`);

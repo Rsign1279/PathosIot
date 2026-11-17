@@ -705,7 +705,7 @@ function loadTexture(url, { flipY = false, wrap = THREE.ClampToEdgeWrapping } = 
     t.colorSpace = THREE.SRGBColorSpace;
     t.flipY = flipY;
     t.wrapS = t.wrapT = wrap;
-    t.anisotropy = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
+    t.anisotropy = renderer ? Math.min(16, renderer.capabilities.getMaxAnisotropy()) : 1;
     return t;
   });
 }
@@ -727,11 +727,9 @@ const yUp = ([x, y, z]) => new THREE.Vector3(x, z, -y);
 async function init() {
   if (!window.WebGLRenderingContext) throw new Error('WebGL unavailable');
   try {
-    const native = Math.max(1, devicePixelRatio || 1);
-    const planned = hardwareResolution(view.clientWidth, view.clientHeight, native, maxRenderDimension, film.w, film.h);
-    // When rendering well above native display density, downsampling already
-    // smooths edges. Avoid also allocating multisample color/depth buffers.
-    renderer = new THREE.WebGLRenderer({ antialias: !!BAKE || planned.ratio / native < 1.5, powerPreference: 'high-performance' });
+    // Keep fine wires, pin rows and engraved geometry clean on every display.
+    // The existing pixel ceiling and offscreen release bound buffer memory.
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   } catch (e) { throw new Error('WebGL unavailable'); }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   stats.shadow = shadowSize;

@@ -31,16 +31,18 @@ fs.mkdirSync(out,{recursive:true});
    await page.waitForTimeout(300);
    const result=await page.evaluate(()=>{
     const p=pathosPrototype,c=p.debug.renderer.domElement;
-    return {state:p.state,stats:p.stats,film:{width:p.film.w,height:p.film.h},buffer:[c.width,c.height],css:[c.clientWidth,c.clientHeight],dpr:devicePixelRatio,memory:performance.memory?.usedJSHeapSize,geometries:p.debug.renderer.info.memory.geometries,textures:p.debug.renderer.info.memory.textures};
+    const poster=document.getElementById('hwPoster');
+    return {state:p.state,stats:p.stats,film:{width:p.film.w,height:p.film.h},poster:[poster.naturalWidth,poster.naturalHeight],buffer:[c.width,c.height],css:[c.clientWidth,c.clientHeight],dpr:devicePixelRatio,memory:performance.memory?.usedJSHeapSize,geometries:p.debug.renderer.info.memory.geometries,textures:p.debug.renderer.info.memory.textures};
    });
    assert.equal(result.state.seq,false);assert.equal(result.stats.model,'./assets/pathos-hardware.glb');assert.equal(result.stats.quality,1);
    assert.equal(result.stats.shadow,2048);assert.equal(result.stats.frames,before,'Hardware draws must stop at rest');
    assert.equal(result.buffer[0],Math.floor(result.css[0]*result.stats.pixelRatio));assert.equal(result.buffer[1],Math.floor(result.css[1]*result.stats.pixelRatio));
    assert(result.stats.pixelRatio>=device.dpr,'HD floor cannot discard native retina pixels');
    assert(result.buffer[0]*result.buffer[1]<=8*1024*1024,'HD hardware buffers stay within allocation budget');
-   assert(result.film.width*result.stats.pixelRatio>=1919.99&&result.film.height*result.stats.pixelRatio>=1079.99,'The actual Blender picture must be 1920 × 1080 or better on every tested layout');
+   assert(result.film.width*result.stats.pixelRatio>=1919.99&&result.film.height*result.stats.pixelRatio>=1079.99,'The actual Blender picture must be 1920 Ã— 1080 or better on every tested layout');
    assert(result.stats.picturePixels[0]>=1920&&result.stats.picturePixels[1]>=1080,'Reported physical film dimensions meet Full HD');
-   if(result.stats.pixelRatio/device.dpr>=1.5)assert.equal(result.stats.antialias,false,'Supersampled output must not allocate duplicate MSAA buffers');
+   assert.equal(result.stats.antialias,true,'Rig edge antialiasing remains enabled on every tested layout');
+   assert.deepEqual(result.poster,[1920,1080],'Browser receives the sharp Full HD loading/fallback poster');
    assert.equal(requests.filter(u=>u.includes('/hw-seq/')).length,0,'Native playback must not download film frames');
    assert.equal(requests.filter(u=>u.includes('hardware-mobile.glb')).length,0);
    await page.locator('#hwStage').screenshot({path:path.join(out,'pathos-hardware-hd-'+device.name+'.png')});
@@ -62,7 +64,7 @@ fs.mkdirSync(out,{recursive:true});
    await page.evaluate(()=>scrollTo({top:pathosPrototype.scrollYForFrame(1360),behavior:'instant'}));
    await page.waitForFunction(()=>pathosPrototype.state.visible&&pathosPrototype.stats.bufferPixels>10000&&!pathosPrototype.state.rendering);
    assert.deepEqual(await page.evaluate(()=>[pathosPrototype.debug.renderer.domElement.width,pathosPrototype.debug.renderer.domElement.height]),result.buffer,'Return restores Full HD resolution');
-   console.log(JSON.stringify({device:device.name,readyMs,buffer:result.buffer,filmPixels:result.stats.picturePixels,antialias:result.stats.antialias,css:result.css,pixelRatio:result.stats.pixelRatio,geometries:result.geometries,textures:result.textures,heapMiB:Math.round(result.memory/1048576),gpu:result.stats.gpu,frames:result.stats.frames,errors,passed:'Full HD actual Blender picture, chapter seeking, original model, zero sequence downloads, 360/zoom/return, idle, offscreen release and return'}));
+   console.log(JSON.stringify({device:device.name,readyMs,buffer:result.buffer,filmPixels:result.stats.picturePixels,poster:result.poster,antialias:result.stats.antialias,css:result.css,pixelRatio:result.stats.pixelRatio,geometries:result.geometries,textures:result.textures,heapMiB:Math.round(result.memory/1048576),gpu:result.stats.gpu,frames:result.stats.frames,errors,passed:'Full HD actual Blender picture and poster, antialiased rig edges, chapter seeking, original model, zero sequence downloads, 360/zoom/return, idle, offscreen release and return'}));
    await context.close();
   }
  }finally{await browser.close();}
