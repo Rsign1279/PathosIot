@@ -1,7 +1,10 @@
 // Presentation-only brand migration. IDs, asset URLs, links and historical
 // media stay intact; the original-page baseline is never rewritten.
+const siteOrigin=new URL(require('../site.config.json').origin).origin;
 function applyBrand(input,{stylesheet=false}={}){
   let html=input.replace(/\bPATHOS(?=%20)/g,'Pathos%20IoT').replace(/\bPATHOS\b/g,'Pathos IoT');
+  const canonical=/<link\b[^>]*rel="canonical"[^>]*href="([^"]+)"/.exec(html)?.[1];
+  if(canonical){const previousOrigin=new URL(canonical).origin;html=html.split(previousOrigin).join(siteOrigin);}
   const beforeLogos=html;
   html=html.replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/g,(whole,attrs,inside,offset)=>{
     const classValue=/\bclass="([^"]*)"/.exec(attrs)?.[1]||'';

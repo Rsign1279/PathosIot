@@ -11,6 +11,11 @@ at commit `df2831c`. Its production deployment is
 The editable integrated edition is on `main` in
 [Rsign1279/PathosIot](https://github.com/Rsign1279/PathosIot).
 
+Live website: [pathosiot.vercel.app](https://pathosiot.vercel.app/).
+Vercel is connected to `PathosIot/main`; pushing edits to that branch deploys
+the site automatically. It is a static site with no install or build command.
+`site.config.json` sets the canonical origin used by the page generators.
+
 ## Run
 
 Clone the source, then serve the checked-in page. No installation or build
