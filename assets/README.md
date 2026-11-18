@@ -1,5 +1,16 @@
 # PATHOS landing page images
 
+## Local typefaces
+
+The partner strip and results use Fraunces (400–600, optical sizing) and
+Space Grotesk (400–700), served as Latin-subset variable WOFF2 files from
+`assets/fonts/`. They are distributed under the SIL Open Font License;
+the original licenses are included beside the fonts. Sources:
+[Fraunces](https://github.com/undercasetype/Fraunces) and
+[Space Grotesk](https://github.com/floriankarsten/space-grotesk).
+
+## Photography
+
 The landing page uses JPEG copies of the four product photographs below.
 The original WebP files are retained. Product references use the same basename
 with `.jpg`; the press card uses `press-instagram-optimized.jpg`.
