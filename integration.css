@@ -122,6 +122,8 @@ html{scroll-behavior:auto;scroll-padding-top:112px}body{background:var(--bg);fon
   .planet-stage-caption{max-width:calc(100% - 124px)}
   .planet-stage .planet-scroll-cue{left:148px;bottom:10px}
 }
+/* Keep the select's arrow in one reserved position after the field reset. */
+#contact .form-group select{background-repeat:no-repeat;background-position:right 12px center;background-size:12px 12px;padding-right:36px}
 /* Partner names and results have their own type palette, sized for reading. */
 #hero .logos,#proof{--font-evidence-serif:Fraunces,Georgia,serif;--font-evidence-sans:'Space Grotesk',Figtree,sans-serif}
 #hero .logos{display:grid;grid-template-columns:1.35fr 1.4fr .8fr .95fr 1.1fr .9fr;align-items:center;gap:24px 28px;padding-top:32px;padding-bottom:8px}
