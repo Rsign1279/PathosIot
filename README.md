@@ -96,8 +96,8 @@ commit `6cfb566` so content preservation is directly auditable.
   Large drawing buffers are released when hidden or offscreen and restored
   before the study returns; the model stays ready without another download.
 - `hero.js`, `film.js` and `media-controls.css`: preserve the real films, with
-  deferred loading, visible background-film pause, a keyboard-accessible seek
-  range, visibility pauses, and reduced-motion alternatives.
+  deferred loading, visible background-film pause, one set of native project-film
+  controls, visibility pauses, and reduced-motion alternatives.
 - `assets/pathos-hardware-poster.webp`: a native 1920 × 1080 lossless render
   of the original film's first frame. It switches directly to the ready 3D
   image without a crossfade that could ghost moving parts. Rebuild it with

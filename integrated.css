@@ -2568,8 +2568,7 @@ a.marble:hover::before, .sig-card.marble:hover::before { transform: scale(1.06);
 /* ==========================================================================
    The PATHOS film (film.js)
    One section right after the results panel: the founder's film plays on
-   its own, muted and looping, with no controls, and a thin gold line shows
-   how far through it is.
+   its own, muted and looping, with one set of native playback controls.
    ========================================================================== */
 .film { position: relative; background: #000; }
 .film-stage { position: relative; overflow: hidden; width: 100%; height: 100svh; background: #000; }
@@ -2577,8 +2576,6 @@ a.marble:hover::before, .sig-card.marble:hover::before { transform: scale(1.06);
   position: absolute; inset: 0; width: 100%; height: 100%; display: block;
   object-fit: cover; background: #000;
 }
-.film-scrub { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, 0.08); }
-.film-scrub span { display: block; height: 100%; background: var(--gold-light); transform-origin: left; transform: scaleX(0); }
 
 
 /* flow.css */
@@ -3317,7 +3314,7 @@ button,summary,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 :is(.caption-2,.caption-4,.title-4){font-size:var(--text-xs);line-height:1.5}
 /* One focus geometry, with a contrast-safe color for each surface. */
 :is(#hero,.nav,.planet-story,#prototype,#contact,.site-foot,.lightbox,#film,.study-nav,.study-foot){--focus-color:var(--color-accent);--focus-halo:var(--color-dark)}
-:is(a,button,input,select,textarea,summary,[tabindex]):focus-visible{
+:is(a,button,input,select,textarea,summary,video[controls],[tabindex]):focus-visible{
   outline:var(--focus-width) solid var(--focus-color)!important;
   outline-offset:var(--focus-offset)!important;
   box-shadow:0 0 0 2px var(--focus-halo)!important;
@@ -3700,13 +3697,3 @@ html:not(.js) #prototype .hw-hud :is(.hw-caption,.hw-line){font:400 1rem/1.5 var
 /* Playback controls remain readable against either frame of the films. */
 .hero-film-control{position:relative;z-index:3;display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-top:24px;padding:10px 16px;border:2px solid var(--color-on-dark-muted);border-radius:var(--radius-control);background:var(--color-dark-raised);color:var(--color-on-dark);font:500 var(--text-sm)/1.4 var(--font-ui);cursor:pointer}
 .hero-film-control:hover{background:var(--color-dark-hover);border-color:var(--color-accent)}
-.film-stage--seekable .film-video{height:calc(100% - 44px)}
-.film-stage--seekable .film-scrub{height:44px;padding:0 16px;display:flex;align-items:center;background:var(--color-dark-raised)}
-.film-stage--seekable .film-scrub>span{display:none}
-.film-seek{--seek-progress:0%;appearance:none;-webkit-appearance:none;width:100%;height:44px;min-width:44px;margin:0;background:transparent;cursor:pointer;accent-color:var(--color-accent)}
-.film-seek:disabled{cursor:default;opacity:.55}
-.film-seek::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--color-accent) 0 var(--seek-progress),var(--color-control-track) var(--seek-progress) 100%)}
-.film-seek::-moz-range-track{height:4px;border-radius:2px;background:var(--color-control-track)}
-.film-seek::-moz-range-progress{height:4px;border-radius:2px;background:var(--color-accent)}
-.film-seek::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border:2px solid var(--color-accent);border-radius:50%;background:var(--color-accent)}
-.film-seek::-moz-range-thumb{width:10px;height:10px;border:2px solid var(--color-accent);border-radius:50%;background:var(--color-accent)}

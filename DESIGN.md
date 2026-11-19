@@ -38,8 +38,8 @@ are exempt from the standalone 44px target rule.
 A dark floor under the hero preserves the marble while making its gold words
 readable across sampled video frames. Surface-aware focus colors share one
 3px/3px ring geometry. A visible film control respects deliberate pause and
-reduced motion. The project film's former decorative progress line is a native
-keyboard range control. Form summaries now update as fields are corrected;
+reduced motion. The project film uses one native playback interface, including
+seeking; its duplicate custom timeline has been removed. Form summaries update as fields are corrected;
 pointer navigation does not focus whole sections. Reusable SVG controls replace
 decorative arrow characters in the interactive controls.
 

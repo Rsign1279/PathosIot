@@ -17,7 +17,7 @@ button,summary,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 :is(.caption-2,.caption-4,.title-4){font-size:var(--text-xs);line-height:1.5}
 /* One focus geometry, with a contrast-safe color for each surface. */
 :is(#hero,.nav,.planet-story,#prototype,#contact,.site-foot,.lightbox,#film,.study-nav,.study-foot){--focus-color:var(--color-accent);--focus-halo:var(--color-dark)}
-:is(a,button,input,select,textarea,summary,[tabindex]):focus-visible{
+:is(a,button,input,select,textarea,summary,video[controls],[tabindex]):focus-visible{
   outline:var(--focus-width) solid var(--focus-color)!important;
   outline-offset:var(--focus-offset)!important;
   box-shadow:0 0 0 2px var(--focus-halo)!important;

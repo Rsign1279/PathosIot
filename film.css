@@ -1,8 +1,7 @@
 /* ==========================================================================
    The PATHOS film (film.js)
    One section right after the results panel: the founder's film plays on
-   its own, muted and looping, with no controls, and a thin gold line shows
-   how far through it is.
+   its own, muted and looping, with one set of native playback controls.
    ========================================================================== */
 .film { position: relative; background: #000; }
 .film-stage { position: relative; overflow: hidden; width: 100%; height: 100svh; background: #000; }
@@ -10,5 +9,3 @@
   position: absolute; inset: 0; width: 100%; height: 100%; display: block;
   object-fit: cover; background: #000;
 }
-.film-scrub { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, 0.08); }
-.film-scrub span { display: block; height: 100%; background: var(--gold-light); transform-origin: left; transform: scaleX(0); }

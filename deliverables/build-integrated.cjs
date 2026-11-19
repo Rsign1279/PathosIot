@@ -108,6 +108,8 @@ html=html.replace('<body>', '<body class="integrated-page">');
 html=html.replace('<div class="menu" id="navLinks">','<button class="planet-motion" id="planetMotion" type="button" aria-pressed="false" aria-label="Pause the planet animation"><span aria-hidden="true">Ⅱ</span><span class="planet-motion-label">Pause planet</span></button>\n            <div class="menu" id="navLinks">');
 html=html.replace(/<video class="hero-video"([^>]*)autoplay ([^>]*)preload="auto"/, '<video class="hero-video"$1$2preload="none"');
 html=html.replace(/<video class="film-video"([^>]*)autoplay ([^>]*)preload="auto"/, '<video class="film-video"$1$2preload="none" controls');
+// The native video controls already include a timeline; omit the old extra bar.
+html=html.replace(/\s*<div class="film-scrub"[^>]*><span id="filmScrub"><\/span><\/div>/,'');
 html=html.replace('PATHOS reads skin conductance, heart rhythm, skin temperature and motion,','PATHOS explores skin conductance, heart rhythm, skin temperature and motion,');
 html=html.replace('with under $25 of parts.','with under $25 of parts. <span class="hero-research-status">Research prototype · Body sensors in development for MVP 2.</span>');
 html=html.replace('<form class="contact-form" id="contactForm" action="https://formsubmit.co/ajax/rsignsv1279@gmail.com" method="post" novalidate>', '<form class="contact-form" id="contactForm" action="https://formsubmit.co/rsignsv1279@gmail.com" data-ajax-action="https://formsubmit.co/ajax/rsignsv1279@gmail.com" method="post">');

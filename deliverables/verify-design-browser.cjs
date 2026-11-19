@@ -103,14 +103,12 @@ async function verifyPlaybackAndStudyFocus(browser){
   const page=await context.newPage(),samples=[];
   try{
     await page.goto(base,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
-    const seek=page.locator('#film .film-seek');await seek.waitFor({state:'attached'});
-    // Reduced motion may leave metadata unloaded. Enable only for this CSS
-    // focus measurement; no playback or synthetic seeking is performed.
-    const wasDisabled=await seek.evaluate(el=>{const disabled=el.disabled;el.disabled=false;return disabled;});
-    const filmFocus=await focusMetrics(page,'#film .film-seek');
-    samples.push({surface:'film seek',...filmFocus,contrast:contrast(filmFocus.color,filmFocus.background)});
-    await page.screenshot({path:path.join(output,'focus-film-seek.png')});
-    await seek.evaluate((el,disabled)=>{el.disabled=disabled;},wasDisabled);
+    const video=page.locator('#filmVideo');await video.waitFor({state:'attached'});
+    check(await video.evaluate(el=>el.controls),'The project film retains native playback and seeking controls');
+    check(await page.locator('#film .film-scrub,#film .film-seek,#film input[type="range"]').count()===0,'The project film has no duplicate custom timeline');
+    const filmFocus=await focusMetrics(page,'#filmVideo');
+    samples.push({surface:'film player',...filmFocus,contrast:contrast(filmFocus.color,filmFocus.background)});
+    await page.screenshot({path:path.join(output,'focus-film-player.png')});
     await page.goto(new URL('hardware.html',base).href,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
     for(const [selector,surface] of [['.study-back','study back link'],['.study-foot a','study footer link']]){
       const focus=await focusMetrics(page,selector);

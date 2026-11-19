@@ -39,6 +39,8 @@ const normalizeBrand=html=>html.replace(/\bPathos%20IoT\b/g,'PATHOS').replace(/\
 function normalizeMarkup(html,id){
   html=normalizeBrand(stripEdge(html));
   if(id==='hero')html=html.replace(/<span class="hero-research-status">[^]*?<\/span>/,'').replace('PATHOS explores skin conductance','PATHOS reads skin conductance');
+  // The owner requested one film timeline: native controls replace this empty bar.
+  if(id==='film')html=html.replace(/\s*<div class="film-scrub"[^>]*><span id="filmScrub"><\/span><\/div>/,'');
   // Loading and progressive-enhancement attributes may change, never content.
   html=html.replace(/<video\b[^>]*>/g,tag=>tag.replace(/\s+(?:autoplay|controls)\b/g,'').replace(/\s+preload=["'][^"']*["']/g,''));
   if(id==='contact')html=html.replace(/<form\b[^>]*>/g,tag=>tag.replace(/\s+novalidate\b/g,'').replace(/\s+data-ajax-action=["'][^"']*["']/g,'').replace('action="https://formsubmit.co/ajax/','action="https://formsubmit.co/'));

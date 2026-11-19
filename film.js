@@ -3,24 +3,12 @@
    browser blocks autoplay or the visitor prefers reduced motion. */
 const stage = document.getElementById('filmStage');
 const video = document.getElementById('filmVideo');
-const bar = document.getElementById('filmScrub');
 
 if (stage && video) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let onScreen = false, near = false, prepared = false, userPaused = false;
   let internalPause = false, blocked = false, pending = false, attempt = 0, motionOverride = false;
-  let frame = 0, videoFrame = false, retryTimer = 0, retries = 0;
-  const scrub = bar?.parentElement;
-  const seek = scrub ? document.createElement('input') : null;
-  if (seek) {
-    seek.type = 'range';seek.className = 'film-seek';
-    seek.min = '0';seek.max = '1000';seek.step = '1';seek.value = '0';seek.disabled = true;
-    seek.setAttribute('aria-label', 'Seek in project film');
-    seek.setAttribute('aria-controls', video.id);
-    scrub.removeAttribute('aria-hidden');
-    bar.setAttribute('aria-hidden', 'true');
-    scrub.append(seek);stage.classList.add('film-stage--seekable');
-  }
+  let retryTimer = 0, retries = 0;
 
   video.muted = true;
   video.loop = true;
@@ -31,45 +19,8 @@ if (stage && video) {
 
   const eligible = () => prepared && onScreen && !document.hidden && (!reduced.matches || motionOverride) && !userPaused && !blocked;
   const clearRetry = () => { clearTimeout(retryTimer); retryTimer = 0; };
-  const timeLabel = value => {
-    const seconds = Math.max(0, Math.floor(value));
-    return seconds < 60 ? `${seconds} seconds` : `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
-  };
-  const drawBar = () => {
-    const available = Number.isFinite(video.duration) && video.duration > 0;
-    if (seek) seek.disabled = !available;
-    if (bar && available) {
-      const progress = Math.max(0, Math.min(1, video.currentTime / video.duration));
-      bar.style.transform = `scaleX(${progress.toFixed(4)})`;
-      if (seek) {
-        seek.value = String(Math.round(progress * 1000));
-        seek.style.setProperty('--seek-progress', `${(progress * 100).toFixed(2)}%`);
-        const label = `${timeLabel(video.currentTime)} of ${timeLabel(video.duration)}`;
-        if (seek.getAttribute('aria-valuetext') !== label) seek.setAttribute('aria-valuetext', label);
-      }
-    }
-  };
-  seek?.addEventListener('input', () => {
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    video.currentTime = Math.min(video.duration, Math.max(0, Number(seek.value) / 1000 * video.duration));
-    drawBar();
-  });
-  const stopDraw = () => {
-    if (!frame) return;
-    if (videoFrame) video.cancelVideoFrameCallback(frame);
-    else cancelAnimationFrame(frame);
-    frame = 0;
-  };
-  const draw = () => {
-    frame = 0;
-    drawBar();
-    if (video.paused || !onScreen || document.hidden) return;
-    videoFrame = typeof video.requestVideoFrameCallback === 'function';
-    frame = videoFrame ? video.requestVideoFrameCallback(draw) : requestAnimationFrame(draw);
-  };
   const pause = () => {
     clearRetry();
-    stopDraw();
     attempt++;
     pending = false;
     if (!video.paused) {
@@ -144,20 +95,15 @@ if (stage && video) {
   video.addEventListener('playing', () => {
     retries = 0;
     clearRetry();
-    if (!frame) draw();
   });
   video.addEventListener('pause', () => {
     clearRetry();
-    stopDraw();
     if (internalPause) internalPause = false;
     else if (onScreen && !document.hidden) userPaused = true;
   });
   video.addEventListener('canplay', tryPlay);
   video.addEventListener('waiting', scheduleRetry);
   video.addEventListener('stalled', scheduleRetry);
-  video.addEventListener('timeupdate', () => { retries = 0; clearRetry(); drawBar(); });
-  video.addEventListener('seeked', drawBar);
-  video.addEventListener('loadedmetadata', drawBar);
-  video.addEventListener('durationchange', drawBar);
-  video.addEventListener('error', () => { blocked = true; clearRetry(); stopDraw(); });
+  video.addEventListener('timeupdate', () => { retries = 0; clearRetry(); });
+  video.addEventListener('error', () => { blocked = true; clearRetry(); });
 }
