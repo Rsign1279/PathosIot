@@ -51,53 +51,32 @@ for (const group of groups) {
   html=html.slice(0,start)+`<div class="planet-story" id="${group.id}" data-planet-story="${group.number}">\n${stage(group)}\n<div class="planet-content">\n${body}\n</div>\n</div>`+html.slice(end);
 }
 
-// Restore the full-width cinematic study and its original in-picture titles,
-// while retaining optional playback instead of the old pinned scroll runway.
+// Preserve the original pinned Blender stage and shot layout. Adaptive mode
+// controls sit above it; optional playback controls stay in its original bar.
 const hardwareStart=html.indexOf('<section id="prototype"');
 const hardwareEnd=html.indexOf('</section>',hardwareStart)+'</section>'.length;
 if(hardwareStart<0||hardwareEnd<hardwareStart)throw new Error('Original hardware study missing');
 let hardware=html.slice(hardwareStart,hardwareEnd);
-const originalHeader=/<header\b[^>]*prototype-head[^>]*>[^]*?<\/header>/.exec(hardware)?.[0];
-if(!originalHeader)throw new Error('Original hardware heading missing');
-let hardwareTrack=hardware.slice(hardware.indexOf('<div class="hw-track"'),hardware.lastIndexOf('</section>')).trim();
-if(!hardwareTrack.includes('id="hwHud"'))throw new Error('Original hardware chapter detail missing');
+hardware=hardware.replace('class="prototype"','class="prototype hw-experience" data-hw-renderer="guided"');
 let chapterIndex=0;
-hardwareTrack=hardwareTrack.replace(/<article class="hw-chapter[^\"]*"/g,tag=>tag+` data-hw-current="${chapterIndex++===0}"`);
-hardwareTrack=hardwareTrack.replace('id="hwHud" aria-live="polite"','id="hwHud" aria-live="off"');
-hardwareTrack=hardwareTrack.replace('<div class="hw-track" id="hwTrack">','<div class="hw-track" id="hwTrack" data-hw-compact="true">');
-hardwareTrack=hardwareTrack.replace('Loading the 3D model…','Preparing the guided visual…');
-hardwareTrack=hardwareTrack.replace('<nav class="hw-rail" id="hwRail" aria-label="Chapters"></nav>','');
-hardwareTrack=hardwareTrack.replace('Back to the film','Back to walkthrough');
-hardwareTrack=hardwareTrack.replace(/[ \t]+\n/g,'\n');
-const hardwareHeading=originalHeader.replace('Scroll to take it apart.','Play the guided visual, move the timeline, or explore the full 3D model.');
-hardware=`<section id="prototype" class="prototype hw-experience" aria-label="PATHOS hardware, two ways to explore" data-hw-renderer="guided">
-  <div class="wrap hw-experience-shell">
-    <div class="hw-experience-copy">
-      ${hardwareHeading}
-      <div class="hw-experience-actions">
-        <button type="button" class="hw-start" id="hwStart"><span id="hwStartText">Start walkthrough</span><span aria-hidden="true">→</span></button>
-        <p class="hw-experience-invite">Want a closer look? Switch to <button type="button" id="hwExplore3D">3D Walkthrough</button>.</p>
-        <p class="hw-mode-note" id="hwModeNote" role="status" aria-live="polite">Guided visual is ready to explore.</p>
-      </div>
-    </div>
-    <div class="hw-experience-main">
-      <div class="hw-mode-tabs" role="tablist" aria-label="Hardware viewing mode">
-        <button type="button" role="tab" id="hwGuidedTab" aria-selected="true" aria-controls="hwExperiencePanel" tabindex="0" data-hw-mode="guided">Guided Visual</button>
-        <button type="button" role="tab" id="hw3DTab" aria-selected="false" aria-controls="hwExperiencePanel" tabindex="-1" data-hw-mode="3d">3D Walkthrough</button>
-      </div>
-      <div class="hw-experience-panel" id="hwExperiencePanel" role="tabpanel" aria-labelledby="hwGuidedTab">
-        ${hardwareTrack}
-        <div class="hw-player-controls">
-          <button type="button" class="hw-play" id="hwPlay" aria-label="Play walkthrough"><span id="hwPlayIcon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5 13 8l-9 5.5Z"/></svg></span><span id="hwPlayText">Play</span></button>
-          <label class="hw-sr" for="hwSeek">Walkthrough position</label>
-          <input type="range" class="hw-seek" id="hwSeek" min="0" max="1000" step="1" value="0" aria-valuetext="Start of the walkthrough">
-          <output class="hw-time" id="hwTime" for="hwSeek">0:00 / 0:48</output>
-        </div>
-      </div>
-      <nav class="hw-rail" id="hwRail" aria-label="Walkthrough chapters"></nav>
-    </div>
+hardware=hardware.replace(/<article class="hw-chapter[^\"]*"/g,tag=>tag+` data-hw-current="${chapterIndex++===0}"`);
+hardware=hardware.replace('id="hwHud" aria-live="polite"','id="hwHud" aria-live="off"');
+hardware=hardware.replace('Loading the 3D model…','Preparing the guided visual…');
+hardware=hardware.replace('Back to the film','Back to walkthrough');
+hardware=hardware.replace('<a class="hw-skip" href="#product">Skip to the build &darr;</a>','<a class="hw-skip" href="#product" aria-label="Skip to the build"><span class="hw-skip-label">Skip to the build &darr;</span><span class="hw-skip-short" aria-hidden="true">Skip</span></a>');
+hardware=hardware.replace('<div class="hw-track" id="hwTrack">', `<div class="wrap hw-mode-heading">
+  <div class="hw-mode-tabs" role="tablist" aria-label="Hardware viewing mode">
+    <button type="button" role="tab" id="hwGuidedTab" aria-selected="true" aria-controls="hwExperiencePanel" tabindex="0" data-hw-mode="guided">Guided Visual</button>
+    <button type="button" role="tab" id="hw3DTab" aria-selected="false" aria-controls="hwExperiencePanel" tabindex="-1" data-hw-mode="3d">3D Walkthrough</button>
   </div>
-</section>`;
+  <p class="hw-mode-note" id="hwModeNote" role="status" aria-live="polite">Scroll to explore the guided visual, or choose the live 3D view.</p>
+</div>
+<div id="hwExperiencePanel" role="tabpanel" aria-labelledby="hwGuidedTab">
+<div class="hw-track" id="hwTrack">`);
+hardware=hardware.replace('<span class="hw-clock"', `<button type="button" class="hw-play" id="hwPlay" aria-label="Play walkthrough"><span id="hwPlayIcon" aria-hidden="true"></span><span id="hwPlayText">Play</span></button>
+<button type="button" class="hw-scroll" id="hwScroll" aria-pressed="true">Scroll</button>
+<span class="hw-clock"`);
+hardware=hardware.replace('</section>','</div>\n</section>');
 html=html.slice(0,hardwareStart)+hardware+html.slice(hardwareEnd);
 
 html=html.replace(/    <link rel="preconnect" href="https:\/\/fonts\.[^\n]+\n/g,'');

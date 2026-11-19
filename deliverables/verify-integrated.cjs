@@ -59,7 +59,7 @@ for(const id of expectedIds){
     const chapters=html=>blocks(html,'article').filter(block=>hasClass(block.open,'hw-chapter')).map(block=>normalizeMarkup(block.inner,id));
     check(JSON.stringify(chapters(before[id].inner))===JSON.stringify(chapters(after[id].inner)),'Hardware: all ten original chapter bodies remain in order');
     for(const match of before[id].inner.matchAll(/\bid=["']([^"']+)["']/g))check(after[id].inner.includes(`id="${match[1]}"`),`Hardware: original control ${match[1]} remains available`);
-    check(/data-hw-compact="true"/.test(after[id].inner)&&/role="tablist"/.test(after[id].inner),'Hardware: compact accessible mode controls are present');
+    check(!/data-hw-compact/.test(after[id].inner)&&/role="tablist"/.test(after[id].inner),'Hardware: original scroll track and accessible mode controls are present');
     continue;
   }
   const oldMarkup=normalizeMarkup(before[id].inner,id),newMarkup=normalizeMarkup(after[id].inner,id);

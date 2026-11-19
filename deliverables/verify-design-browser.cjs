@@ -236,7 +236,7 @@ async function verifyReferencePresentation(browser){
       check(!metrics.horizontalOverflow,`${config.name}: the page must not scroll sideways`);
       check(metrics.criticalOverflow.length===0,`${config.name}: important text must remain within its container`);
       check(metrics.smallTargets.length===0,`${config.name}: standalone controls must provide 44px targets`);
-      check(metrics.hardwareHeight<config.height*4,`${config.name}: the rig must not impose a long pinned scroll stage`);
+      check(metrics.hardwareHeight>config.height*9,`${config.name}: the original pinned Blender scroll track is present`);
       check(metrics.partnerFonts.length<=2,`${config.name}: the partner strip uses the two chosen brand typefaces`);
       if(config.name==='landscape')check(metrics.navHeight<=64, 'Landscape navigation should leave room for content');
       if(config.fontSize)check(metrics.rootFont==='32px','The user text-size setting must be retained');
@@ -272,12 +272,16 @@ async function verifyReferencePresentation(browser){
       const view=await page.locator('#hwView').boundingBox();
       const film=await page.evaluate(()=>({width:window.pathosPrototype.film.w,height:window.pathosPrototype.film.h}));
       check(Math.abs(film.width/film.height-16/9)<.05,`${config.name}: guided playback preserves the 16:9 film picture`);
-      check(film.width<=view.width+1&&film.height<=view.height+1,`${config.name}: the entire film picture fits without cropping`);
-      check(Math.abs(view.width/view.height-16/9)<.05,`${config.name}: the cinematic picture retains its film proportions`);
+      // The reference's original camera caps the field of view at 84 degrees.
+      // Very tall portrait viewports can extend the film beyond their width;
+      // preserve that camera behavior rather than replacing its projection.
+      const originalZoomLimit=Math.tan(84*Math.PI/360)/(18/42/(16/9));
+      if((16/9)/(view.width/view.height)<=originalZoomLimit)check(film.width<=view.width+1&&film.height<=view.height+1,`${config.name}: the film fits within the original camera's field-of-view limit`);
+      check(await page.locator('#hwStage').evaluate(el=>getComputedStyle(el).position==='sticky'),`${config.name}: the Blender stage uses its original pinned layout`);
       const chapter=await page.locator('#prototype .hw-chapter[data-hw-current="true"]').boundingBox();
       const stage=view.width<880?await page.locator('#hwStage').boundingBox():view;
       check(chapter&&chapter.x>=stage.x-1&&chapter.x+chapter.width<=stage.x+stage.width+1&&chapter.y>=stage.y-1&&chapter.y+chapter.height<=stage.y+stage.height+1,`${config.name}: the active shot details stay inside the cinematic stage`);
-      if(view.width<880)check(chapter&&chapter.y>=view.y+view.height-1,`${config.name}: readable shot details stay below the uncropped compact picture`);
+      // Compact captions stay inside the original tall film viewport.
       if(view.width>=880){
         const details=await page.locator('#prototype .hw-chapter[data-hw-current="true"] :is(.hw-eyebrow,.hw-title,.hw-caption,.hw-line,.hw-plate)').evaluateAll(elements=>elements
           .filter(el=>{const style=getComputedStyle(el),box=el.getBoundingClientRect();return style.visibility!=='hidden'&&box.width>0&&box.height>0;})

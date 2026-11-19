@@ -1,5 +1,23 @@
 # Pathos IoT design record
 
+## Original pinned Blender and app tours restored
+
+The linked `pathos-landing-tau.vercel.app` source matches commit `6cfb566`.
+Its Blender scroll mapping, 1080svh/980svh track, sticky full-height stage,
+in-picture shot titles and internal chapter rail are restored. The app tour
+again uses the original 340vh/300vh track, four screenshot ranges and alternating
+turns at each screen boundary. Scrolling in either direction updates both tours;
+the MacBook display retains the original film-frame screen changes.
+Reduced motion keeps this user-driven scrubbing and removes its easing rather
+than silently disabling scrolling; automatic 3D promotion remains conservative.
+
+The recent Pathos fonts, buttons, engraved planet, form fixes and single native
+project-video controls remain. Guided-first/adaptive 3D and truthful mode tabs
+remain; optional Play and Scroll controls sit inside the original Blender bar.
+The previous release is retained on `backup/pre-scroll-restoration-11622fe`.
+Browser verification now tests real forward/reverse scrolling, all four app
+screens, turning motion, pinned geometry, and every MacBook display state.
+
 ## Cinematic hardware and Wispr reference adaptation
 
 The supplied Wispr Flow document is a visual reference, not a replacement brief.

@@ -61,8 +61,8 @@ commit `6cfb566` so content preservation is directly auditable.
   spacing, focus, touch targets, button states, and motion. Active layout
   boundaries are 640px, 900px and 1100px. Component-specific picture fitting
   remains separate from navigation behavior.
-- `compact-layout.css`: direct software and photo controls replace the long
-  pinned scroll tracks while retaining all four screens and six photographs.
+- `compact-layout.css`: direct photo controls retain all six photographs;
+  the software tour keeps its restored pinned scroll track and four screens.
 - `integration.js`: one shared optional WebGL planet across two passages.
   One scroll-derived angle drives both its rotation and each original content
   row's emergence. Text remains normal HTML with its original UI behavior.
@@ -79,10 +79,10 @@ commit `6cfb566` so content preservation is directly auditable.
   hints can veto a probe; only a benchmark of the actual full-resolution scene
   can enable automatic 3D. Software rendering, reduced motion, coarse pointers,
   saving data, and uncertain performance keep Guided. No analytics are sent.
-- `hardware-experience.js` and `.css`: full-width cinematic hardware presentation,
-  Guided Visual / 3D Walkthrough tabs, optional playback, timeline, and ten chapter
-  controls. Original shot titles overlay the desktop film and flow below the
-  picture on smaller views. Manual input wins
+- `hardware-experience.js` and `.css`: original pinned Blender hardware presentation,
+  Guided Visual / 3D Walkthrough tabs, optional playback, and ten chapter
+  controls. Original shot titles and the chapter rail remain inside the tall
+  film viewport; scrolling follows the original animation in either direction. Manual input wins
   over pending automatic decisions. Sustained lag or graphics loss returns to
   Guided at the same film position. Stale requests and a 45-second loading
   timeout cannot reactivate 3D. Both the landing and standalone hardware page
@@ -140,6 +140,7 @@ node deliverables/verify-orbit-motion.cjs
 node deliverables/verify-brand.cjs
 node deliverables/verify-hardware.cjs
 node deliverables/verify-hardware-adaptive.cjs
+node deliverables/verify-scroll-restoration.cjs
 ```
 
 The audit compares every original section's text and content collections,

@@ -555,52 +555,111 @@ function initEdgeArt(arts) {
   }, { passive: true });
 }
 
-/* ---------- Software tour ----------
-   Four real screens selected directly, without a pinned page-scroll track. */
+/* ---------- Device tour ----------
+   Scroll through the tall #device-tour section: the iPad tilts in, then turns
+   between screens, and the screenshot switches at the peak of each turn.
+   Targets are computed on scroll; a rAF loop eases toward them and stops once
+   settled, so nothing runs while the section is idle or off screen. */
+
 function initDevice() {
-  const section=document.getElementById('device-tour');
-  const device=document.getElementById('device');
-  if(!section||!device)return;
-  const shots=[...device.querySelectorAll('.screen-shot')];
-  const steps=[...section.querySelectorAll('.step-btn')];
-  const captions=[...section.querySelectorAll('.device-caption')];
-  if(!shots.length||!steps.length)return;
-  let index=-1;
-  section.classList.add('is-compact');
-  function show(value){
-    const selected=Math.max(0,Math.min(shots.length-1,Math.round(value)));
-    if(selected===index)return;
-    index=selected;
-    shots.forEach((shot,i)=>{
-      shot.classList.toggle('is-on',i===index);
-      shot.setAttribute('aria-hidden',String(i!==index));
+  const section = document.getElementById('device-tour');
+  const device = document.getElementById('device');
+  if (!section || !device) return;
+  // The heading sits above the tall track that holds the pinned stage, so
+  // scroll timing is measured on the track, not the whole section.
+  const track = document.getElementById('deviceTrack') || section;
+  const shots = Array.from(device.querySelectorAll('.screen-shot'));
+  const steps = Array.from(section.querySelectorAll('.step-btn'));
+  const caps = Array.from(section.querySelectorAll('.device-caption'));
+  const n = shots.length;
+  let index = -1;
+
+  function show(i) {
+    if (i === index) return;
+    index = i;
+    shots.forEach((el, k) => { el.classList.toggle('is-on', k === i); el.setAttribute('aria-hidden', String(k !== i)); });
+    steps.forEach((el, k) => {
+      el.classList.toggle('is-on', k === i);
+      el.setAttribute('aria-pressed', String(k === i));
+      if (k === i) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
     });
-    steps.forEach((button,i)=>{
-      button.classList.toggle('is-on',i===index);
-      button.setAttribute('aria-pressed',String(i===index));
-      if(i===index)button.setAttribute('aria-current','step');
-      else button.removeAttribute('aria-current');
-    });
-    captions.forEach((caption,i)=>{
-      caption.classList.toggle('is-on',i===index);
-      caption.hidden=i!==index;
-    });
+    caps.forEach((el, k) => { el.classList.toggle('is-on', k === i); el.setAttribute('aria-hidden', String(k !== i)); });
   }
-  steps.forEach((button,i)=>{
-    button.addEventListener('click',()=>show(i));
-    button.addEventListener('keydown',event=>{
-      let next;
-      if(event.key==='ArrowRight')next=(i+1)%steps.length;
-      if(event.key==='ArrowLeft')next=(i+steps.length-1)%steps.length;
-      if(event.key==='Home')next=0;
-      if(event.key==='End')next=steps.length-1;
-      if(next===undefined)return;
-      event.preventDefault();show(next);steps[next].focus();
-    });
-  });
-  for(const [property,value] of Object.entries({'--rx':'0deg','--ry':'0deg','--rz':'0deg','--s':'1'}))device.style.setProperty(property,value);
-  show(0);
-  window.pathosDevice={goTo:show,get state(){return{index,count:shots.length};}};
+
+  window.pathosDevice = { goTo: i => steps[Math.max(0, Math.min(n - 1, i))].click(), get state() { return { index, count: n }; } };
+
+  // Scroll range during which the stage is pinned.
+  const range = () => Math.max(1, track.offsetHeight - innerHeight);
+  const progress = () => Math.min(1, Math.max(0, -track.getBoundingClientRect().top / range()));
+
+  steps.forEach((btn, i) => btn.addEventListener('click', () => {
+    const top = track.getBoundingClientRect().top + scrollY + range() * ((i + 0.5) / n);
+    scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }));
+
+  steps.forEach((button, i) => button.addEventListener('keydown', event => {
+    const next = event.key === 'ArrowRight' ? (i + 1) % n : event.key === 'ArrowLeft' ? (i + n - 1) % n : event.key === 'Home' ? 0 : event.key === 'End' ? n - 1 : null;
+    if (next === null) return;
+    event.preventDefault(); steps[next].focus({preventScroll:true}); steps[next].click();
+  }));
+
+  const smooth = t => t * t * (3 - 2 * t);
+  const cur = { rx: 0, ry: 0, rz: 0, s: 1 };
+  const tgt = { rx: 0, ry: 0, rz: 0, s: 1 };
+  let running = false, visible = false;
+
+  function computeTargets() {
+    const rect = track.getBoundingClientRect();
+    const vh = innerHeight;
+    // Entry: from first sight until the stage pins, the device tilts flat.
+    const enter = smooth(Math.min(1, Math.max(0, 1 - rect.top / vh)));
+    const p = progress();
+    const x = p * n;                               // 0..n across the screens
+    show(Math.min(n - 1, Math.floor(x)));
+    // Turn around each boundary (1..n-1): peaks exactly when the screen switches.
+    let turn = 0;
+    for (let b = 1; b < n; b++) {
+      const d = Math.abs(x - b);
+      if (d < 0.42) turn = smooth(1 - d / 0.42) * (b % 2 ? 1 : -1);
+    }
+    tgt.rx = (1 - enter) * 26 + Math.abs(turn) * 4;
+    tgt.ry = turn * 18;
+    tgt.rz = (1 - enter) * -5 + turn * -1.2;
+    tgt.s = 0.9 + enter * 0.1 - Math.abs(turn) * 0.025;
+  }
+
+  function apply() {
+    device.style.setProperty('--rx', cur.rx.toFixed(2) + 'deg');
+    device.style.setProperty('--ry', cur.ry.toFixed(2) + 'deg');
+    device.style.setProperty('--rz', cur.rz.toFixed(2) + 'deg');
+    device.style.setProperty('--s', cur.s.toFixed(4));
+  }
+
+  function loop() {
+    let moving = false;
+    for (const k in cur) {
+      const d = tgt[k] - cur[k];
+      if (Math.abs(d) > 0.001) { cur[k] += d * 0.16; moving = true; } else cur[k] = tgt[k];
+    }
+    apply();
+    if (moving && visible) raf(loop); else running = false;
+  }
+
+  function onScroll() {
+    computeTargets();
+    if (reduceMotion) return;
+    if (!running && visible) { running = true; raf(loop); }
+  }
+
+  new IntersectionObserver(es => { visible = es[es.length - 1].isIntersecting; if (visible) onScroll(); },
+    { rootMargin: '200px 0px' }).observe(section);
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll, { passive: true });
+
+  // Start in the tilted pose so the first frame matches the entry animation.
+  computeTargets();
+  if (!reduceMotion) Object.assign(cur, tgt);
+  apply();
 }
 
 /* ---------- Images + lightbox ---------- */

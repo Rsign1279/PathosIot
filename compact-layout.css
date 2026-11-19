@@ -1,20 +1,13 @@
-/* The software and field stories fit the page, rather than pinning visitors
-   through several screens. Existing media and all captions remain available. */
-#device-tour.is-compact{height:auto;padding-bottom:var(--space-16,4rem)}
-#device-tour.is-compact .device-track{height:auto}
-#device-tour.is-compact .device-stage{position:relative;top:auto;height:auto;min-height:0;padding:var(--space-8,2rem) var(--gutter,1.5rem) 0;perspective:none}
-#device-tour.is-compact .device{width:min(60rem,100%);transform:none;will-change:auto;border-radius:var(--radius-panel,1.5rem)}
-#device-tour.is-compact .device-shadow{display:none}
-#device-tour.is-compact .device-meta{width:min(60rem,100%);margin-top:var(--space-6,1.5rem);gap:var(--space-4,1rem)}
-#device-tour.is-compact .device-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,8.5rem),1fr));width:100%;gap:var(--space-1,.25rem);box-shadow:none}
-#device-tour.is-compact .device-steps>li{min-width:0;display:flex}
-#device-tour.is-compact .step-btn{width:100%;height:auto;min-height:2.75rem;padding:.75rem;justify-content:center;white-space:normal;font-size:var(--text-sm,.875rem)!important;line-height:1.35;border-radius:var(--radius-control,.5rem)}
-#device-tour.is-compact .step-btn>span{font-size:var(--text-xs,.8125rem)}
-#device-tour.is-compact .device-captions{height:auto;min-height:0;max-width:44rem}
-#device-tour.is-compact .device-caption{position:static;inset:auto;height:auto;transform:none;font-size:var(--text-base,1rem)!important;line-height:1.55;opacity:1}
-#device-tour.is-compact .device-caption[hidden]{display:none}
-#device-tour.is-compact .screen-shot{transition:opacity var(--motion-base,240ms) ease;transform:none}
-
+/* Field photographs retain their direct controls. Software uses its original pinned scroll tour. */
+/* Preserve that tour's geometry while allowing enlarged text to reflow. */
+#device-tour .device-meta{min-width:0;grid-template-columns:minmax(0,1fr);max-width:100%}
+#device-tour .device-steps{max-width:100%;flex-wrap:wrap}
+#device-tour .device-steps>li{flex:1 1 5rem;min-width:0}
+#device-tour .step-btn{width:100%;white-space:normal;overflow-wrap:anywhere}
+#device-tour .device-captions{display:grid;grid-template-columns:minmax(0,1fr);height:auto;min-height:72px}
+#device-tour .device-caption{position:relative;grid-area:1/1;visibility:hidden}
+#device-tour .device-caption.is-on{visibility:visible}
+@media(max-width:640px){#device-tour .device-captions{min-height:96px}}
 #product.field.is-compact{padding-bottom:var(--space-16,4rem)}
 #product.field.is-compact .fl-track{height:auto}
 #product.field.is-compact .fl-stage{position:relative;top:auto;height:auto;min-height:0;width:min(100%,72rem);margin:0 auto;padding:var(--space-8,2rem) var(--gutter,1.5rem) 0;perspective:none;overflow:visible;cursor:auto;touch-action:pan-y pinch-zoom}
@@ -32,10 +25,6 @@
 #product.field.is-compact .fl-count{min-width:0;flex:1 1 auto;font-size:var(--text-sm,.875rem)}
 #product.field.is-compact .fl-btn{display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px}
 @media(max-width:640px){
-  #device-tour.is-compact .step-btn{justify-content:flex-start}
   #product.field.is-compact .fl-ui{grid-template-columns:minmax(0,1fr);gap:var(--space-4,1rem)}
   #product.field.is-compact .fl-nav{justify-content:space-between}
-}
-@media(prefers-reduced-motion:reduce){
-  #device-tour.is-compact .screen-shot{transition:none}
 }

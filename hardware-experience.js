@@ -6,31 +6,11 @@ if(section?.classList.contains('hw-experience')){
   const play=document.getElementById('hwPlay');
   const playText=document.getElementById('hwPlayText');
   const playIcon=document.getElementById('hwPlayIcon');
-  const seek=document.getElementById('hwSeek');
-  const time=document.getElementById('hwTime');
-  const start=document.getElementById('hwStart');
-  const startText=document.getElementById('hwStartText');
   const note=document.getElementById('hwModeNote');
-  const view=document.getElementById('hwView');
-  const stage=document.getElementById('hwStage');
-  const hud=document.getElementById('hwHud');
+  const scroll=document.getElementById('hwScroll');
   const chapters=[...section.querySelectorAll('.hw-chapter')];
-  let current={rendererMode:'guided',playback:'paused',progress:0,chapter:0,frame:1,ready:false,loading3D:false};
-  let seeking=false,lastChapter=-1,lastNote='',captionFrame=0;
-  function sizeCaption(){
-    if(captionFrame||!view||!stage||!hud)return;
-    captionFrame=requestAnimationFrame(()=>{
-      captionFrame=0;
-      const stacked=view.classList.contains('is-compact');
-      // The compact HUD uses one shared grid cell for all ten chapters.
-      // Invisible chapters still establish its stable intrinsic maximum.
-      const height=stacked?Math.ceil(hud.getBoundingClientRect().height):0;
-      stage.classList.toggle('has-stacked-hud',stacked);
-      stage.style.setProperty('--hw-caption-height',height+'px');
-    });
-  }
-  const clamp=value=>Math.min(1,Math.max(0,Number(value)||0));
-  const clock=seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
+  let current={rendererMode:'guided',playback:'scroll',progress:0,chapter:0,frame:1,ready:false,loading3D:false};
+  let lastChapter=-1,lastNote='';
   const setText=(element,value)=>{if(element&&element.textContent!==value)element.textContent=value;};
   let iconPlaying=null;
   function setPlayIcon(playing){
@@ -44,6 +24,7 @@ if(section?.classList.contains('hw-experience')){
     const mode=current.rendererMode==='3d'?'3d':'guided';
     section.dataset.hwRenderer=mode;
     section.dataset.hwPlayback=current.playback||'paused';
+    scroll?.setAttribute('aria-pressed',String(current.playback==='scroll'));
     section.dataset.hwLoading3d=String(!!current.loading3D);
     for(const tab of tabs){
       const selected=tab.dataset.hwMode===mode;
@@ -55,24 +36,16 @@ if(section?.classList.contains('hw-experience')){
     const playing=current.playback==='play';
     setText(playText,playing?'Pause':'Play');setPlayIcon(playing);
     play?.setAttribute('aria-label',playing?'Pause walkthrough':'Play walkthrough');
-    setText(startText,mode==='3d'?(current.mode==='orbit'?'Back to walkthrough':'Start exploring'):playing?'Pause walkthrough':'Start walkthrough');
-    const progress=clamp(current.progress);
-    if(!seeking&&seek)seek.value=String(Math.round(progress*1000));
-    seek?.style.setProperty('--hw-progress',`${(progress*100).toFixed(1)}%`);
-    const seconds=Number.isFinite(current.frame)?Math.max(0,(current.frame-1)/60):progress*48;
     const chapter=Math.max(0,Math.min(chapters.length-1,Number(current.chapter)||0));
-    const chapterName=chapters[chapter]?.dataset.rail||'Overview';
-    setText(time,`${clock(seconds)} / 0:48`);
-    seek?.setAttribute('aria-valuetext',`${clock(seconds)} of 0:48 — ${chapterName}`);
     if(chapter!==lastChapter){
       chapters.forEach((element,index)=>{const selected=index===chapter;element.dataset.hwCurrent=String(selected);element.setAttribute('aria-hidden',String(!selected));});
       lastChapter=chapter;
     }
     if(current.loading3D)setNote('Preparing the 3D walkthrough. You can keep using the guided visual.');
-    else if(current.modeReason==='Guided playback is ready.')setNote(current.playback==='scroll'?'Scroll through the guided visual, or press Play.':playing?'The guided walkthrough is playing.':'Use Play, the timeline, or a chapter to explore.');
-    else if(current.modeReason==='Interactive 3D is ready.')setNote(current.mode==='orbit'?'Drag to look around, or select a part to learn more.':'Choose Start exploring to rotate the rig, or Play to watch.');
+    else if(current.modeReason==='Guided playback is ready.')setNote(current.playback==='scroll'?'Scroll to take the rig apart, or press Play.':playing?'The guided walkthrough is playing.':'Choose Scroll, Play, or a chapter to explore.');
+    else if(current.modeReason==='Interactive 3D is ready.')setNote(current.mode==='orbit'?'Drag to look around, or select a part to learn more.':'Choose 360° view to rotate the rig, or scroll to follow the walkthrough.');
     else if(current.modeReason)setNote(current.modeReason);
-    else setNote(mode==='3d'?'Explore every part in 3D, or play the complete walkthrough.':'Play, move the timeline, or choose a chapter.');
+    else setNote(mode==='3d'?'Explore every part in 3D, or play the complete walkthrough.':'Scroll through the rig, press Play, or choose a chapter.');
   }
   async function action(callback){
     try{
@@ -92,26 +65,9 @@ if(section?.classList.contains('hw-experience')){
       event.preventDefault();tabs.forEach((button,i)=>button.tabIndex=i===target?0:-1);tabs[target].focus();
     });
   });
+  scroll?.addEventListener('click',()=>action(api=>api.resumeScroll()));
   play?.addEventListener('click',()=>action(api=>current.playback==='play'?api.pause():api.play()));
-  start?.addEventListener('click',()=>{
-    section.querySelector('.hw-experience-main')?.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});
-    action(api=>current.rendererMode==='3d'?(current.mode==='orbit'?api.exitOrbit():api.enterOrbit()):current.playback==='play'?api.pause():api.play());
-  });
-  document.getElementById('hwExplore3D')?.addEventListener('click',()=>{
-    document.getElementById('hw3DTab')?.focus();action(api=>api.setRendererMode('3d',{manual:true}));
-  });
-  seek?.addEventListener('pointerdown',()=>{seeking=true;});
-  seek?.addEventListener('input',()=>{
-    const progress=clamp(Number(seek.value)/1000);seek.style.setProperty('--hw-progress',`${progress*100}%`);
-    action(api=>api.seek(progress,{manual:true}));
-  });
-  const endSeek=()=>{if(seeking){seeking=false;sync(window.pathosPrototype?.state);}};
-  addEventListener('pointerup',endSeek);addEventListener('pointercancel',endSeek);
-  seek?.addEventListener('change',()=>{seeking=false;sync(window.pathosPrototype?.state);});
-  seek?.addEventListener('blur',endSeek);
   document.addEventListener('pathos:hardwarestate',event=>sync(event.detail));
   document.addEventListener('pathos:hardwareready',()=>sync(window.pathosPrototype?.state));
-  if(hud&&view){const captionSizes=new ResizeObserver(sizeCaption);captionSizes.observe(hud);captionSizes.observe(view);}
   sync(window.pathosPrototype?.state||current);
-  sizeCaption();
 }

@@ -45,7 +45,7 @@ const orbitUi = document.getElementById('hwOrbitUi');
 const rail = document.getElementById('hwRail');
 const scrubEl = document.getElementById('hwScrub');
 const frameEl = document.getElementById('hwFrame');
-// A reduced-motion study changes only when a chapter is explicitly selected.
+// User scrolling still selects film frames with reduced motion; easing stops.
 const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionQuery.matches;
 motionQuery.addEventListener('change', e => {
@@ -117,10 +117,9 @@ function progressAt(frame) {
 // moment it pins until the moment it releases.
 let pinTop = parseFloat(getComputedStyle(stage).top) || 0;
 addEventListener('resize', () => { pinTop = parseFloat(getComputedStyle(stage).top) || 0; });
-const compactStudy = () => track.dataset.hwCompact==='true';
-const scrollRange = () => compactStudy()?Math.max(1,stage.offsetHeight+innerHeight*.44):Math.max(1, track.offsetHeight - stage.offsetHeight);
-const scrollProgress = () => compactStudy()?clamp((innerHeight*.72-stage.getBoundingClientRect().top)/scrollRange(),0,1):clamp((pinTop - track.getBoundingClientRect().top) / scrollRange(), 0, 1);
-const scrollYForFrame = f => (compactStudy()?stage.getBoundingClientRect().top+scrollY-innerHeight*.72:track.getBoundingClientRect().top+scrollY-pinTop)+progressAt(f)*scrollRange()+1;
+const scrollRange = () => Math.max(1, track.offsetHeight - stage.offsetHeight);
+const scrollProgress = () => clamp((pinTop - track.getBoundingClientRect().top) / scrollRange(), 0, 1);
+const scrollYForFrame = f => track.getBoundingClientRect().top + scrollY - pinTop + progressAt(f) * scrollRange() + 1;
 
 /* ---------- Rail + scrubber ---------- */
 
@@ -211,7 +210,7 @@ layoutFilm(view.clientWidth || 1, view.clientHeight || 1);
 const stats = { ready: false, frames: 0, drawCalls: 0, triangles: 0, quality: 0, model: MODEL, page: 0, gpu: '', low: false, shadow: 0 };
 let renderer, scene, camera, mixer;
 let cur = FIRST, tgt = FIRST, visible = false, dirty = true, raf = 0, last = 0;
-let playback=reduced?'paused':'scroll',manualInteracted=false,manualMode=false,requestedRenderer='guided',loading3D=false,modeReason='Preparing the guided visual…',lastStateEvent=-Infinity;
+let playback='scroll',manualInteracted=false,manualMode=false,requestedRenderer='guided',loading3D=false,modeReason='Preparing the guided visual…',lastStateEvent=-Infinity;
 let glPromise=null,benchmarking=false,benchmarkTicket=0,modeRequest=0,autoConsidered=false,autoTimer=0,contextLost=false;
 const pacing=createHardwareMonitor();
 let appliedFrame = NaN, renderWidth = 0, renderHeight = 0, renderRatio = 0, maxRenderDimension = 8192;
@@ -261,9 +260,13 @@ function selectChapter(index){
   const c=chapters[clamp(Math.round(Number(index)||0),0,chapters.length-1)];
   const frame=c.start?Math.min(c.start+40,c.end-12):c.shotStart+40;
   seek(progressAt(frame));
+  scrollTo({top:scrollYForFrame(frame),behavior:'instant'});
+  playback='scroll';
+  publish(true);
 }
 function play(){markManual();if(mode==='orbit')exitOrbit();if(cur>=LAST-1)cur=tgt=FIRST;playback='play';last=0;dirty=true;wake();publish(true);}
 function pause(){markManual();playback='paused';tgt=cur;dirty=true;wake();publish(true);}
+function resumeScroll(){markManual();if(mode==='orbit')exitOrbit();playback='scroll';cur=tgt=frameAt(scrollProgress());updateHud(cur);dirty=true;last=0;wake();publish(true);}
 function resetOrbit(){
   mode='film';tween=null;if(orbit)orbit.enabled=false;
   if(renderer)renderer.domElement.style.touchAction='pan-y';
@@ -575,7 +578,7 @@ function render(now) {
   if(playback==='play'&&mode==='film'){
     tgt=Math.min(LAST,tgt+dt*FPS);
     if(tgt===LAST){playback='paused';publish(true);}
-  }else if (!reduced&&playback==='scroll') tgt = frameAt(scrollProgress());
+  }else if (playback==='scroll') tgt = frameAt(scrollProgress());
   const k = reduced ? 1 : 1 - Math.exp(-dt * 11);
   cur += (tgt - cur) * k;
   if (Math.abs(tgt - cur) < 0.08) cur = tgt;
@@ -793,7 +796,7 @@ function seqStart() {
   if(!seqCtx){seqFail();return;}
   resize();
   new ResizeObserver(resize).observe(view);
-  const initialFrame=!reduced&&playback==='scroll'?frameAt(scrollProgress()):cur;
+  const initialFrame=playback==='scroll'?frameAt(scrollProgress()):cur;
   seqRequest(clamp((initialFrame-FIRST)/SEQ.step,0,SEQ.n-1));
   new IntersectionObserver(entries => {
     visible = entries[entries.length - 1].isIntersecting;
@@ -806,7 +809,7 @@ function seqStart() {
       const r = stage.getBoundingClientRect();
       if (r.bottom > -120 && r.top < innerHeight + 120) { visible = true; dirty = true; }
     }
-    if(!reduced&&playback==='scroll'){dirty=true;wake();}
+    if(playback==='scroll'){dirty=true;wake();}
   }, { passive: true });
   orbitBtn.hidden=USE_SEQ;
 }
@@ -1197,7 +1200,7 @@ if (BAKE) {
 window.pathosPrototype = {
   stats, film,
   get state() {return stateSnapshot();},
-  setRendererMode,play,pause,seek,selectChapter,
+  setRendererMode,play,pause,seek,selectChapter,resumeScroll,
   frameAt, progressAt, scrollProgress, scrollYForFrame,
   get debug() { return { scene, camera, mixer, orbit, orbitCam, renderer }; },
   enterOrbit: async () => {if(USE_SEQ)await setRendererMode('3d');if(!USE_SEQ)enterOrbit();}, exitOrbit: () => exitOrbit(),

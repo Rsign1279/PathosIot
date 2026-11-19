@@ -46,15 +46,18 @@ fs.mkdirSync(out,{recursive:true});
      }
     }
     if(device.reduced){
-     const beforeScroll=await page.evaluate(()=>pathosPrototype.state.frame);await page.mouse.wheel(0,25);await page.waitForTimeout(100);
-     assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),beforeScroll,'Reduced motion does not start automatic scroll playback');
+     await page.evaluate(()=>scrollTo(0,pathosPrototype.scrollYForFrame(pathosPrototype.frameAt(.4))));
+     await page.waitForFunction(()=>Math.abs(pathosPrototype.state.progress-.4)<.006);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.playback),'scroll','User scroll still scrubs the original film with reduced motion');
+     assert(await page.evaluate(()=>Math.abs(pathosPrototype.state.frame-pathosPrototype.state.target)<.1),'Reduced motion removes easing rather than disabling scroll control');
     }
     for(const index of [0,4,7,9]){
-     await page.locator('#hwRail button').nth(index).click();
+     if(await page.locator('#hwRail button').nth(index).isVisible())await page.locator('#hwRail button').nth(index).click();
+     else await page.evaluate(i=>pathosPrototype.selectChapter(i),index);
      await page.waitForFunction(i=>pathosPrototype.state.chapter===i,index);
      assert.equal(await page.locator('.hw-chapter[data-hw-current="true"]').count(),1);
     }
-    await page.locator('#hwSeek').evaluate(el=>{el.value='250';el.dispatchEvent(new Event('input',{bubbles:true}));});
+    await page.evaluate(()=>pathosPrototype.seek(.25));
     await page.waitForFunction(()=>Math.abs(pathosPrototype.state.progress-.25)<.002);
     const selectedFrame=await page.evaluate(()=>pathosPrototype.state.frame);await page.mouse.wheel(0,10);await page.waitForTimeout(100);
     assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),selectedFrame,'Manual timeline choices take precedence over subsequent page scrolling');
@@ -139,7 +142,7 @@ fs.mkdirSync(out,{recursive:true});
     }
    }
    const geometry=await page.locator('#hwTrack').evaluate(el=>({track:el.offsetHeight,stage:document.getElementById('hwStage').offsetHeight,width:document.getElementById('hwStage').getBoundingClientRect().width,viewport:innerWidth}));
-   assert(Math.abs(geometry.track-geometry.stage)<2,'The player must not reserve a long scroll runway');
+   assert(geometry.track>geometry.stage*8,'The original Blender scroll runway is restored');
    if(geometry.viewport>=1200)assert(geometry.width>=geometry.viewport*.8,'Desktop hardware must retain the full-width cinematic stage');
    assert(await page.locator('#hwHud').evaluate(el=>!!el.closest('#hwView')),'Shot titles stay inside the cinematic view');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
