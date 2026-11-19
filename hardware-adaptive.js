@@ -11,6 +11,17 @@ export function excellentHardware(samples) {
   return p95(cost)<8&&cost.at(-1)<14&&p95(interval)<21&&interval.at(-1)<35;
 }
 
+// Critically damped, time-based movement: gentle acceleration and settling,
+// with the same response on 30/60/120 Hz displays and no free-running inertia.
+export function advanceHardwareMotion(frame,velocity,target,seconds,reduced=false){
+  if(reduced)return {frame:target,velocity:0};
+  const dt=Math.max(0,Math.min(.1,Number(seconds)||0)),rate=20;
+  const error=frame-target,combined=velocity+rate*error,decay=Math.exp(-rate*dt);
+  const next=target+(error+combined*dt)*decay;
+  const speed=(velocity-rate*combined*dt)*decay;
+  return Math.abs(next-target)<.05&&Math.abs(speed)<.5?{frame:target,velocity:0}:{frame:next,velocity:speed};
+}
+
 // Ignore idle gaps. Require sustained poor pacing while frames are requested;
 // a single busy frame or a return from a background tab is not a downgrade.
 export function createHardwareMonitor() {

@@ -72,13 +72,23 @@ commit `6cfb566` so content preservation is directly auditable.
   material-anchored logo engraving with recessed, light-catching bevels.
 - `brand.css` and `assets/brand/`: the supplied Pathos IoT identity, rebuilt
   as crisp vectors for navigation, footer, icons and social previews.
-- `prototype-loader.js`: prepares guided frames one viewport ahead. Guided is
-  the first mode, using the existing 1280 × 720 picture samples with a bounded
-  six-frame mobile or ten-frame desktop cache and three concurrent requests.
+- `prototype-loader.js`: prepares the guide two viewports ahead, without an
+  unconditional page-load import. Guided is the first mode.
+- `hardware-guided-film.js` and `assets/hardware/rig-1080p60.mp4`: the original
+  scene rendered natively at 1920 × 1080, 60fps, with all 2,880 film frames.
+  Standard BT.709 colour and two-frame keyframe intervals keep playback
+  compatible and forward/reverse seeking responsive. The browser paints and
+  decodes the movie directly. One seek runs at a time;
+  newer scroll positions replace the queued target. Shot labels follow the
+  decoded frame. The old 720p images are an explicit media-error fallback only.
+  Native playback, offscreen suspension and short keyframe intervals avoid
+  image-cache stalls and blended/doubled geometry.
 - `hardware-adaptive.js`: conservative, browser-local playback policy. Hardware
   hints can veto a probe; only a benchmark of the actual full-resolution scene
   can enable automatic 3D. Software rendering, reduced motion, coarse pointers,
   saving data, and uncertain performance keep Guided. No analytics are sent.
+  Scroll motion uses a time-based critically damped response; reduced motion
+  selects the requested pose directly.
 - `hardware-experience.js` and `.css`: original pinned Blender hardware presentation,
   Guided Visual / 3D Walkthrough tabs, optional playback, and ten chapter
   controls. Original shot titles and the chapter rail remain inside the tall
@@ -141,6 +151,8 @@ node deliverables/verify-brand.cjs
 node deliverables/verify-hardware.cjs
 node deliverables/verify-hardware-adaptive.cjs
 node deliverables/verify-scroll-restoration.cjs
+node deliverables/verify-hardware-film.cjs
+node deliverables/verify-guided-motion.cjs
 ```
 
 The audit compares every original section's text and content collections,

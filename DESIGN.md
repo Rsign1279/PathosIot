@@ -1,5 +1,32 @@
 # Pathos IoT design record
 
+## Native guided film and decoded-frame motion
+
+Restoring the pinned layout did not address the guided renderer's quality:
+it enlarged a 720p, ten-sample-per-second sequence, and its small image window
+could fall behind scrolling. The guide now uses a newly rendered native
+1920 × 1080, 60fps movie with all 2,880 original rig frames and two-frame GOPs.
+The export converts to standard BT.709 video colour so Safari decodes and
+seeks correctly, while retaining the native master for reproducibility.
+The browser compositor paints the visible video directly; frames are neither
+enlarged from the old preview nor crossfaded between different model poses.
+One in-flight seek and a latest-target queue avoid continually cancelling
+decodes. Labels and published progress follow the frame actually decoded.
+Chapter changes and the final settled decode publish immediately, so controls
+cannot remain on a previous picture after the render loop stops.
+
+Time-based critically damped scrolling softens starts, reversals and settling
+without introducing autonomous playback. Reduced motion keeps direct user
+scrubbing. Optional Play uses the media clock and decoder's frame callback,
+with no competing animation clock. The guide pauses offscreen, prepares only
+near the hardware section, and retains the existing manual/adaptive 3D policy.
+Legacy images remain a clearly identified media-error fallback.
+
+Verification includes real scroll motion, decoded frame counts, maximum gaps,
+forward/reverse requests, rest/offscreen suspension, native resolution, all
+original frame/page timings and Chrome/Firefox/WebKit behavior. Browser-engine
+checks do not substitute for a physical Mac or phone GPU measurement.
+
 ## Original pinned Blender and app tours restored
 
 The linked `pathos-landing-tau.vercel.app` source matches commit `6cfb566`.

@@ -30,7 +30,7 @@ test(source.includes('room.dispose()')&&source.includes('pmrem.dispose()')&&sour
 test(source.includes('await renderer.compileAsync(scene, camera)'),'Shader compilation can run asynchronously');
 test(source.includes('if (!visible || document.hidden) return;'),'Offscreen or background hardware cannot keep rendering');
 test(source.includes('renderer.setSize(1, 1, false)')&&source.includes('if(renderer&&!USE_SEQ&&!renderWidth)resize()'),'Invisible study releases large draw buffers and restores them before live display');
-test(read('prototype-loader.js').includes("rootMargin:'100% 0px'"),'Model preparation begins one viewport ahead');
+test(read('prototype-loader.js').includes("rootMargin:'200% 0px'"),'Guided preparation begins two viewports ahead');
 test(source.includes("PATHOS dashboard • inset rounded window")&&source.includes('PATHOS_ROOT__static'),'Original model lookup names survive');
 test(source.includes('maxRenderDimension, film.w, film.h'),'Allocation uses actual Blender picture dimensions rather than the whole viewport');
 test(/new THREE\.WebGLRenderer\(\{\s*antialias:\s*true\b/.test(source),'Thin rig details retain edge antialiasing on desktop and mobile');

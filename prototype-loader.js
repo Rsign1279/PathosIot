@@ -12,5 +12,5 @@ const start=()=>{
 window.pathosLoadHardware=start;
 if(section){
   if(location.hash.startsWith('#prototype')||new URLSearchParams(location.search).has('bake'))start().catch(()=>{});
-  else new IntersectionObserver((entries,observer)=>{if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();start().catch(()=>{});}},{rootMargin:'100% 0px'}).observe(section);
+  else new IntersectionObserver((entries,observer)=>{if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();start().catch(()=>{});}},{rootMargin:'200% 0px'}).observe(section);
 }

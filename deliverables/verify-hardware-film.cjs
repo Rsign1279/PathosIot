@@ -1,0 +1,8 @@
+// Verify the shipped film's real resolution, cadence, duration and seek interval.
+const {execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const file=path.resolve(__dirname,'../assets/hardware/rig-1080p60.mp4');
+const info=JSON.parse(execFileSync('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=codec_name,width,height,avg_frame_rate,nb_frames,pix_fmt,color_space,color_transfer,color_primaries','-show_entries','format=duration,size','-of','json',file],{encoding:'utf8'}));
+const stream=info.streams[0];assert.equal(stream.codec_name,'h264');assert.equal(stream.width,1920);assert.equal(stream.height,1080);assert.equal(stream.avg_frame_rate,'60/1');assert.equal(stream.color_transfer,'bt709');assert.equal(stream.color_primaries,'bt709');assert.equal(stream.color_space,'bt709');assert.equal(Number(stream.nb_frames),2880);assert(Math.abs(Number(info.format.duration)-48)<.02);assert(fs.statSync(file).size<90*1024*1024,'The deployment must support the film as a regular static asset');
+const keys=JSON.parse(execFileSync('ffprobe',['-v','error','-skip_frame','nokey','-select_streams','v:0','-show_entries','frame=best_effort_timestamp_time','-of','json',file],{encoding:'utf8',maxBuffer:2*1024*1024})).frames.map(f=>Number(f.best_effort_timestamp_time));
+const maximumSeekInterval=Math.max(...keys.slice(1).map((time,i)=>time-keys[i]));assert(maximumSeekInterval<=4/60+.00001,'Short keyframe intervals keep forward and reverse seeking responsive');
+console.log(JSON.stringify({width:stream.width,height:stream.height,fps:60,frames:2880,duration:info.format.duration,bytes:info.format.size,maximumSeekInterval}));

@@ -13,8 +13,9 @@
      through the four v1 screenshots on the film's frames, the wallpaper is the
      marble artwork, and the table carries the marble panel at the right edge
      of the frame during the opening and closing shots.
-   - Guided playback uses a bounded nearby frame cache. Explicit or measured
-     live 3D retains the original geometry and Full HD picture resolution.
+   - Guided playback uses the native 1080p/60fps film, with precise queued
+     seeking. Lightweight preview images are an explicit error fallback.
+     Live 3D retains the original geometry and Full HD picture resolution.
    ========================================================================== */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -22,7 +23,8 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { hardwareResolution } from './hardware-quality.js';
-import {canProbeHardware,excellentHardware,createHardwareMonitor,sequencePair} from './hardware-adaptive.js';
+import {canProbeHardware,excellentHardware,createHardwareMonitor,sequencePair,advanceHardwareMotion} from './hardware-adaptive.js';
+import {createGuidedFilm} from './hardware-guided-film.js';
 
 const FPS = 60, FIRST = 1, LAST = 2880;
 // The film's frame: 16:9 on a 36 mm-wide sensor.
@@ -65,7 +67,9 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const SEQ = { step: 6, w: 1600, h: 800, fw: 1280, fh: 720, url: k => `./assets/hw-seq/${String(k).padStart(3, '0')}.webp` };
 SEQ.n = Math.floor((LAST - FIRST) / SEQ.step) + 1;
 // ?bake renders frames for that sequence; nothing else runs.
-const BAKE = new URLSearchParams(location.search).has('bake') ? { w: SEQ.w, h: SEQ.h, s: 1.5 } : null;
+const bakeQuery = new URLSearchParams(location.search);
+const BAKE = bakeQuery.has('bake') ? bakeQuery.get('bake')==='film'
+  ? {w:1920,h:1080,s:1,film:true} : { w: SEQ.w, h: SEQ.h, s: 1.5 } : null;
 // Guided frames are the safe first view. Live 3D is either explicitly chosen
 // or promoted after measuring this exact scene at its intended resolution.
 let USE_SEQ = !BAKE;
@@ -210,8 +214,10 @@ layoutFilm(view.clientWidth || 1, view.clientHeight || 1);
 const stats = { ready: false, frames: 0, drawCalls: 0, triangles: 0, quality: 0, model: MODEL, page: 0, gpu: '', low: false, shadow: 0 };
 let renderer, scene, camera, mixer;
 let cur = FIRST, tgt = FIRST, visible = false, dirty = true, raf = 0, last = 0;
+let motionVelocity=0;
 let playback='scroll',manualInteracted=false,manualMode=false,requestedRenderer='guided',loading3D=false,modeReason='Preparing the guided visual…',lastStateEvent=-Infinity;
 let glPromise=null,benchmarking=false,benchmarkTicket=0,modeRequest=0,autoConsidered=false,autoTimer=0,contextLost=false;
+let lastHardwareInput=performance.now();
 const pacing=createHardwareMonitor();
 let appliedFrame = NaN, renderWidth = 0, renderHeight = 0, renderRatio = 0, maxRenderDimension = 8192;
 const pickables = [];
@@ -236,8 +242,9 @@ function disposeFailedGL(){
 
 function stateSnapshot(){
   const baked=USE_SEQ&&mode==='film'&&!tween;
-  return {frame:cur,target:tgt,chapter:activeChapter,visible,rendering:!!raf,page:baked?pageAt(Math.round(cur)):shownPage,art:baked?artAt(Math.round(cur)):uArt.value,mode,seq:USE_SEQ,tweening:!!tween,label:pinned?LABELS[pinned.obj.name][0]:null,
-    rendererMode:USE_SEQ?'guided':'3d',playback,progress:progressAt(cur),modeReason,loading3D,ready:USE_SEQ?seqDrawn:!!stats.gl};
+  const frame=baked&&guidedFilm&&seqDrawn?guidedFilm.frame:cur;
+  return {frame,target:tgt,chapter:activeChapter,visible,rendering:!!raf||!!(guidedFilm&&USE_SEQ&&visible&&playback==='play'),page:baked?pageAt(Math.round(frame)):shownPage,art:baked?artAt(Math.round(frame)):uArt.value,mode,seq:USE_SEQ,tweening:!!tween,label:pinned?LABELS[pinned.obj.name][0]:null,
+    rendererMode:USE_SEQ?'guided':'3d',playback,progress:progressAt(frame),modeReason,loading3D,ready:USE_SEQ?seqDrawn:!!stats.gl};
 }
 function publish(force=false){
   const now=performance.now();if(!force&&now-lastStateEvent<100)return;lastStateEvent=now;
@@ -253,8 +260,10 @@ function syncCanvasAccess(){
 }
 function markManual(){manualInteracted=true;benchmarkTicket++;benchmarking=false;clearTimeout(autoTimer);}
 function seek(progress,{manual=true}={}){
+  motionVelocity=0;
+  guidedFilm?.setPlaying(false);
   if(manual)markManual();playback='paused';cur=tgt=frameAt(clamp(Number(progress)||0,0,1));
-  if(mode==='orbit')exitOrbit();updateHud(cur);dirty=true;last=0;pacing.reset();wake();publish(true);
+  if(mode==='orbit')exitOrbit();if(!guidedFilm||!USE_SEQ)updateHud(cur);dirty=true;last=0;pacing.reset();wake();publish(true);
 }
 function selectChapter(index){
   const c=chapters[clamp(Math.round(Number(index)||0),0,chapters.length-1)];
@@ -264,24 +273,27 @@ function selectChapter(index){
   playback='scroll';
   publish(true);
 }
-function play(){markManual();if(mode==='orbit')exitOrbit();if(cur>=LAST-1)cur=tgt=FIRST;playback='play';last=0;dirty=true;wake();publish(true);}
-function pause(){markManual();playback='paused';tgt=cur;dirty=true;wake();publish(true);}
-function resumeScroll(){markManual();if(mode==='orbit')exitOrbit();playback='scroll';cur=tgt=frameAt(scrollProgress());updateHud(cur);dirty=true;last=0;wake();publish(true);}
+function play(){markManual();motionVelocity=0;if(mode==='orbit')exitOrbit();if(guidedFilm&&USE_SEQ)cur=tgt=guidedFilm.frame;if(cur>=LAST-1){cur=tgt=FIRST;if(USE_SEQ)guidedFilm?.seek(FIRST);}playback='play';last=0;dirty=true;wake();publish(true);}
+function pause(){markManual();motionVelocity=0;guidedFilm?.setPlaying(false);if(guidedFilm&&USE_SEQ)cur=guidedFilm.frame;playback='paused';tgt=cur;dirty=true;wake();publish(true);}
+function resumeScroll(){markManual();motionVelocity=0;guidedFilm?.setPlaying(false);if(mode==='orbit')exitOrbit();playback='scroll';cur=tgt=frameAt(scrollProgress());if(!guidedFilm)updateHud(cur);dirty=true;last=0;wake();publish(true);}
 function resetOrbit(){
   mode='film';tween=null;if(orbit)orbit.enabled=false;
   if(renderer)renderer.domElement.style.touchAction='pan-y';
   stage.classList.remove('is-orbit');orbitBtn.setAttribute('aria-pressed','false');orbitUi.hidden=true;closeLabel();tip.hidden=true;
 }
 function guided(reason='Guided playback is ready.'){
+  motionVelocity=0;guidedFilm?.seek(cur);
   benchmarkTicket++;modeRequest++;benchmarking=false;requestedRenderer='guided';loading3D=false;
   resetOrbit();USE_SEQ=true;modeReason=!seqDrawn&&reason==='Guided playback is ready.'?'Preparing the guided visual…':reason;pacing.reset();last=0;
   if(!seqCanvas)seqStart();
   showLive(false);seqRequest(clamp((cur-FIRST)/SEQ.step,0,SEQ.n-1));
-  releaseDrawBuffer();orbitBtn.hidden=true;
+  if(renderer?.domElement.style.visibility!=='visible')releaseDrawBuffer();orbitBtn.hidden=true;
   stats.ready=seqDrawn;dirty=true;wake();publish(true);
 }
 function activate3D(reason){
   if(!stats.gl||contextLost||renderer?.getContext().isContextLost()||requestedRenderer!=='3d')return;
+  if(USE_SEQ&&guidedFilm?.ready)cur=tgt=guidedFilm.frame;
+  motionVelocity=0;
   USE_SEQ=false;loading3D=false;modeReason=reason;stats.ready=true;if(visible&&!document.hidden)resize();else releaseDrawBuffer();showLive(true);
   orbitBtn.hidden=false;pacing.reset();last=0;dirty=true;wake();publish(true);
 }
@@ -300,9 +312,15 @@ async function setRendererMode(value,{manual=true}={}){
 }
 
 function considerAuto3D(){
-  if(autoConsidered||manualInteracted||manualMode||BAKE||!seqReady||!canProbeHardware({reduced,saveData:navigator.connection?.saveData,coarse:matchMedia('(pointer:coarse)').matches,cores:navigator.hardwareConcurrency,memory:navigator.deviceMemory,width:innerWidth,visible:visible&&!document.hidden}))return;
-  autoConsidered=true;
-  autoTimer=setTimeout(()=>{if(!manualInteracted&&!manualMode&&visible&&!document.hidden)benchmark3D();},1500);
+  if(autoConsidered||benchmarking||manualInteracted||manualMode||BAKE||!seqReady||!canProbeHardware({reduced,saveData:navigator.connection?.saveData,coarse:matchMedia('(pointer:coarse)').matches,cores:navigator.hardwareConcurrency,memory:navigator.deviceMemory,width:innerWidth,visible:visible&&!document.hidden}))return;
+  clearTimeout(autoTimer);
+  const whenQuiet=()=>{
+    if(manualInteracted||manualMode||!visible||document.hidden)return;
+    const remaining=1500-(performance.now()-lastHardwareInput);
+    if(remaining>0){autoTimer=setTimeout(whenQuiet,remaining);return;}
+    autoConsidered=true;benchmark3D();
+  };
+  autoTimer=setTimeout(whenQuiet,1500);
 }
 async function benchmark3D(){
   const ticket=++benchmarkTicket;benchmarking=true;
@@ -318,7 +336,7 @@ async function benchmark3D(){
       apply([150,460,780,1080,1360,1590,1820,2060,2350,2720][index%10]);
       renderer.render(scene,camera);gl.finish();
       const cost=performance.now()-startedAt;
-      if(cost>35||gl.getError()!==gl.NO_ERROR)return;
+      if(cost>35||(index>=4&&(cost>=14||now-previous>=35))||gl.getError()!==gl.NO_ERROR)return;
       if(index>=4)samples.push({cost,interval:now-previous});previous=now;
     }
     stats.benchmark={samples:samples.length,excellent:excellentHardware(samples)};
@@ -327,7 +345,7 @@ async function benchmark3D(){
   finally{
     benchmarking=false;
     if(renderer&&!contextLost){apply(cur);if(USE_SEQ)releaseDrawBuffer();}
-    updateHud(cur);dirty=true;wake();publish(true);
+    updateHud(guidedFilm?.ready&&USE_SEQ?guidedFilm.frame:cur);dirty=true;wake();publish(true);considerAuto3D();
   }
 }
 
@@ -383,7 +401,7 @@ function resize() {
   layoutFilm(w, h);
   if (BAKE) {
     // A view 1600x800 with the film frame 1280x720 in the middle.
-    film.zoom = SEQ.h / SEQ.fh; film.w = SEQ.fw; film.h = SEQ.fh;
+    film.zoom = BAKE.film?1:SEQ.h / SEQ.fh; film.w = BAKE.film?BAKE.w:SEQ.fw; film.h = BAKE.film?BAKE.h:SEQ.fh;
     film.x = (w - film.w) / 2; film.y = (h - film.h) / 2; film.lift = 0;
   }
   if (seqCanvas) seqResize(w, h);
@@ -575,14 +593,13 @@ function render(now) {
   const dt = Math.min(0.1, interval / 1000);
   last = now;
 
-  if(playback==='play'&&mode==='film'){
+  if(playback==='play'&&mode==='film'&&(!guidedFilm||!USE_SEQ)){
     tgt=Math.min(LAST,tgt+dt*FPS);
     if(tgt===LAST){playback='paused';publish(true);}
   }else if (playback==='scroll') tgt = frameAt(scrollProgress());
-  const k = reduced ? 1 : 1 - Math.exp(-dt * 11);
-  cur += (tgt - cur) * k;
-  if (Math.abs(tgt - cur) < 0.08) cur = tgt;
-  let moving = cur !== tgt||playback==='play';
+  const movement=advanceHardwareMotion(cur,motionVelocity,tgt,dt,reduced);
+  cur=clamp(movement.frame,FIRST,LAST);motionVelocity=cur===movement.frame?movement.velocity:0;
+  let moving = cur !== tgt||(playback==='play'&&(!guidedFilm||!USE_SEQ));
   if (mode === 'orbit' && orbit) {
     syncProjection(orbitCam);
     // Zoom buttons ease the distance; damping keeps every move gentle.
@@ -601,7 +618,7 @@ function render(now) {
   showLive(live);
 
   if ((moving || dirty) && !live) {
-    updateHud(cur);
+    if(!guidedFilm)updateHud(cur);
     drawSeq(cur);
     // A pinned label follows its part: pose the (undrawn) scene to match.
     if (pinned && mixer) { apply(cur); placeLabel(); }
@@ -635,13 +652,14 @@ function releaseDrawBuffer() {
   renderer.shadowMap.needsUpdate=true;
 }
 document.addEventListener('visibilitychange', () => {
+  guidedFilm?.setActive(!document.hidden&&visible&&USE_SEQ);
   if (document.hidden) {
     if (raf) cancelAnimationFrame(raf);
     raf = 0; last = 0;
     benchmarkTicket++;benchmarking=false;releaseDrawBuffer();pacing.reset();suspendSequence();last=0;
   } else {
     if (visible && renderer && !renderWidth&&!USE_SEQ) resize();
-    dirty = true; wake(); seqPump();
+    dirty = true; wake(); seqPump();considerAuto3D();
   }
   publish(true);
 });
@@ -649,6 +667,7 @@ document.addEventListener('visibilitychange', () => {
 /* ---------- Pre-rendered film ---------- */
 
 let seqCanvas = null, seqCtx = null, seqReady = false,seqDrawn=false, seqDpr = 1, seqKey = '', liveShown = null;
+let guidedFilm=null;
 // Never preload the whole film: keep six decoded images on phones or ten on
 // desktop, with three in-flight requests. Obsolete bitmaps are explicitly closed.
 const smallSequence=matchMedia('(max-width:640px)').matches;
@@ -687,6 +706,7 @@ function seqRequest(u) {
   seqPump();
 }
 function seqPump() {
+  if(guidedFilm)return;
   if (!USE_SEQ || document.hidden || (!visible && seqReady)) return;
   for (const k of seqWanted) {
     if (seqPending.size >= SEQ_CONCURRENCY) break;
@@ -722,17 +742,19 @@ function seqPump() {
 
 function seqResize(w, h) {
   if (!seqCanvas) return;
-  seqDpr = Math.min(devicePixelRatio || 1, 1.5);
+  seqDpr = Math.min(devicePixelRatio || 1, 2);
   const width=Math.round(w*seqDpr),height=Math.round(h*seqDpr);
   if(seqCanvas.width===width&&seqCanvas.height===height)return;
   seqCanvas.width=width;seqCanvas.height=height;seqDrawn=false;
   if(USE_SEQ){stats.ready=false;stage.classList.remove('is-ready');}
   seqKey = ''; dirty = true; wake();
+  guidedFilm?.redraw();
 }
 // Draws the two samples either side of frame f, blended, with the image's
 // film frame on the view's film frame; edges feather into the backdrop.
 function drawSeq(f) {
   if (!seqCtx) return;
+  if(guidedFilm){guidedFilm.setPlaying(playback==='play');if(playback!=='play')guidedFilm.seek(f);return;}
   const u = clamp((f - FIRST) / SEQ.step, 0, SEQ.n - 1);
   seqRequest(u);
   const pair=sequencePair(f,seqImgs.keys(),chapters.slice(1).map(chapter=>chapter.shotStart),FIRST,SEQ.step);
@@ -763,10 +785,15 @@ function drawSeq(f) {
   if(!seqDrawn){seqDrawn=true;stats.ready=true;if(modeReason==='Preparing the guided visual…')modeReason='Guided playback is ready.';stage.classList.remove('is-static');stage.classList.add('is-ready');statusEl.hidden=true;publish(true);}
 }
 function showLive(on) {
+  if(on)guidedFilm?.setPlaying(false);
+  guidedFilm?.setActive(!on&&visible&&!document.hidden);
   if (on === liveShown) return;
+  // A switch back to Guided can need one decode. Hold the last native
+  // picture until that frame arrives instead of flashing an older pose.
+  const holdNative=!on&&liveShown===true&&guidedFilm?.ready&&!contextLost&&Math.abs(guidedFilm.frame-cur)>1;
   liveShown = on;
-  if (renderer) renderer.domElement.style.visibility = on ? 'visible' : 'hidden';
-  if (seqCanvas) seqCanvas.style.visibility = on ? 'hidden' : 'visible';
+  if (renderer) renderer.domElement.style.visibility = on||holdNative ? 'visible' : 'hidden';
+  if (seqCanvas) seqCanvas.style.visibility = on||guidedFilm ? 'hidden' : 'visible';
   seqKey = ''; dirty = true;
 }
 // The live scene, built only when someone asks for it: a click on the
@@ -797,14 +824,32 @@ function seqStart() {
   resize();
   new ResizeObserver(resize).observe(view);
   const initialFrame=playback==='scroll'?frameAt(scrollProgress()):cur;
-  seqRequest(clamp((initialFrame-FIRST)/SEQ.step,0,SEQ.n-1));
+  guidedFilm=createGuidedFilm({host:view,url:'./assets/hardware/rig-1080p60.mp4?v=1',
+    onReady:dimensions=>{seqReady=true;seqCanvas.style.visibility='hidden';stats.guidedSource='native-film';stats.guidedPixels=[dimensions.width,dimensions.height];stats.seqCached=0;stats.seqPending=0;considerAuto3D();},
+    onFrame:(frame,video)=>{
+      if(!USE_SEQ||!seqCtx)return;
+      if(renderer&&renderer.domElement.style.visibility!=='hidden'){renderer.domElement.style.visibility='hidden';if(!benchmarking)releaseDrawBuffer();}
+      stats.presentedFrame=frame;stats.presentations=(stats.presentations||0)+1;
+      const previousChapter=activeChapter,becameReady=!seqDrawn;
+      updateHud(frame);if(playback==='play'){cur=tgt=frame;motionVelocity=0;}
+      if(!seqDrawn){seqDrawn=true;stats.ready=true;modeReason='Guided playback is ready.';stage.classList.remove('is-static');stage.classList.add('is-ready');statusEl.hidden=true;}
+      publish(becameReady||previousChapter!==activeChapter||(!raf&&playback!=='play'));
+    },
+    onError:()=>{guidedFilm=null;if(USE_SEQ&&renderer){renderer.domElement.style.visibility='hidden';if(!benchmarking)releaseDrawBuffer();}seqReady=false;seqDrawn=false;stats.ready=false;seqCanvas.style.visibility='visible';stage.classList.remove('is-ready');stats.guidedSource='preview';modeReason='The Full HD film could not load. Showing the lightweight preview.';seqRequest(clamp((cur-FIRST)/SEQ.step,0,SEQ.n-1));dirty=true;wake();publish(true);},
+    onBuffering:loading=>{if(loading&&visible&&USE_SEQ){statusEl.textContent='Loading the next part of the walkthrough…';statusEl.hidden=false;}else if(seqDrawn)statusEl.hidden=true;},
+    onEnded:()=>{playback='paused';tgt=cur;publish(true);}
+  });
+  guidedFilm.seek(initialFrame);
   new IntersectionObserver(entries => {
     visible = entries[entries.length - 1].isIntersecting;
+    guidedFilm?.setActive(visible&&!document.hidden&&USE_SEQ);
     if (visible) {if(renderer&&!USE_SEQ&&!renderWidth)resize();dirty = true; wake(); seqPump();considerAuto3D(); }
     else {benchmarkTicket++;benchmarking=false;if(mode==='orbit'){exitOrbit();tween=null;}releaseDrawBuffer();pacing.reset();suspendSequence();last=0;}
     publish(true);
   }, { rootMargin: '120px 0px' }).observe(stage);
   addEventListener('scroll', () => {
+    lastHardwareInput=performance.now();
+    if(benchmarking){benchmarkTicket++;autoConsidered=false;}
     if (!visible) {
       const r = stage.getBoundingClientRect();
       if (r.bottom > -120 && r.top < innerHeight + 120) { visible = true; dirty = true; }
@@ -931,7 +976,7 @@ async function init({probe=false}={}) {
 
   scene.add(gltf.scene);
   if(renderer!==owner||contextLost||context.isContextLost())throw new Error('3D context was lost during loading');
-  if(probe&&requestedRenderer!=='3d'&&(manualInteracted||document.hidden||!visible))throw new Error('Automatic 3D check cancelled');
+  if(probe&&requestedRenderer!=='3d'&&(manualInteracted||document.hidden||!visible||performance.now()-lastHardwareInput<1500))throw new Error('Automatic 3D check cancelled');
   camera = gltf.cameras[0];
   if (!camera) throw new Error('Model has no camera');
   camera.near = 0.004; camera.far = 20;
@@ -1185,14 +1230,26 @@ const start = () => {
   near.disconnect();
   if (USE_SEQ) seqStart(); else startGL().catch(()=>fail('The interactive model could not load. The still remains available.'));
 };
-const near = new IntersectionObserver(es => { if (es[es.length - 1].isIntersecting) start(); }, { rootMargin: '100% 0px' });
+const near = new IntersectionObserver(es => { if (es[es.length - 1].isIntersecting) start(); }, { rootMargin: '200% 0px' });
 near.observe(stage);
 if (BAKE) {
   // Offline rendering of the sequence (deliverables/hw-bake.cjs).
   started = true; near.disconnect();
   init().then(async () => {
     await Promise.all(PAGES.map((url, i) => pageTex[i] || loadTexture(url).then(t => { pageTex[i] = t; })));
-    window.pathosBake = f => { resize(); shownPage = -1; apply(f); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); };
+    let bakedShadowPose='';
+    window.pathosBakeCanvas = f => {
+      resize();shownPage=-1;apply(f);
+      if(BAKE.film){
+        // Camera, screen and non-casting pulses do not change any shadow.
+        // Reuse shadows only when every caster retains its exact world pose.
+        scene.updateMatrixWorld(true);const poses=[];
+        scene.traverse(o=>{if(o.isMesh&&o.castShadow)poses.push(o.visible,...o.matrixWorld.elements);});
+        const pose=poses.join(',');renderer.shadowMap.needsUpdate=pose!==bakedShadowPose;bakedShadowPose=pose;
+      }
+      renderer.render(scene,camera);return renderer.domElement;
+    };
+    window.pathosBake = f => window.pathosBakeCanvas(f).toDataURL('image/png');
     window.pathosBakeReady = true;
   });
 }
@@ -1202,7 +1259,7 @@ window.pathosPrototype = {
   get state() {return stateSnapshot();},
   setRendererMode,play,pause,seek,selectChapter,resumeScroll,
   frameAt, progressAt, scrollProgress, scrollYForFrame,
-  get debug() { return { scene, camera, mixer, orbit, orbitCam, renderer }; },
+  get debug() { return { scene, camera, mixer, orbit, orbitCam, renderer, guidedVideo:guidedFilm?.video, guidedMetrics:guidedFilm?.metrics }; },
   enterOrbit: async () => {if(USE_SEQ)await setRendererMode('3d');if(!USE_SEQ)enterOrbit();}, exitOrbit: () => exitOrbit(),
   // Tests: pose the live scene at the current frame (with the pre-rendered
   // film it is only posed when picked or labelled).

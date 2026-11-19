@@ -8,9 +8,11 @@ node_modules/
 *.blend
 *.blend1
 *.mp4
+*.h264
 *.zip
 **/frames/
 *.log
 !assets/film/film-1080.mp4
 !assets/hero/hero.mp4
 !assets/hero/hero-portrait.mp4
+!assets/hardware/rig-1080p60.mp4

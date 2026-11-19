@@ -112,7 +112,7 @@ check(!/fonts\.(?:googleapis|gstatic)\.com/.test(current+css),'Integrated page m
 for(const file of ['integration.css','brand.css','design-tokens.css','ui-system.css','hardware-experience.css','compact-layout.css','media-controls.css'])check(css.includes(prepareStylesheet(read(file))),`The served bundle includes the current root-relative ${file}`);
 check(!/(?:^|[;{])\s*font-size\s*:[^;}]*\dpx\b/m.test(css),'Compiled text sizes must respect root text settings');
 check(!/(?:^|[;{])\s*line-height\s*:[^;}]*\dpx\b/m.test(css),'Compiled text leading must grow with enlarged type');
-const changedScripts=['main.js','story.js','play.js','integration.js','orbit-motion.js','prototype-loader.js','planet.js','prototype.js','hardware-quality.js','hero.js','film.js','deliverables/build-integrated.cjs'];
+const changedScripts=['main.js','story.js','play.js','integration.js','orbit-motion.js','prototype-loader.js','planet.js','prototype.js','hardware-quality.js','hardware-adaptive.js','hardware-guided-film.js','hero.js','film.js','deliverables/build-integrated.cjs'];
 for(const script of changedScripts){const result=spawnSync(process.execPath,['--check',path.join(root,script)],{encoding:'utf8'});check(result.status===0,`${script}: JavaScript syntax error ${result.stderr}`);}
 
 const pages=['index.html','hardware.html','privacy.html','404.html'];

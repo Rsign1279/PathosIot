@@ -269,6 +269,9 @@ async function verifyReferencePresentation(browser){
       await page.locator('#hwGuidedTab').focus();await page.locator('#hwGuidedTab').press('ArrowRight');
       check(await page.locator('#hw3DTab').evaluate(el=>document.activeElement===el),`${config.name}: keyboard arrows move between tabs`);
       check(await page.locator('#hwGuidedTab').getAttribute('aria-selected')==='true',`${config.name}: focus alone must not activate the expensive renderer`);
+      // Measure a settled, captioned pose rather than a pending scroll seek.
+      await page.evaluate(()=>pathosPrototype.seek(pathosPrototype.progressAt(730)));
+      await page.waitForFunction(()=>Math.abs(pathosPrototype.state.frame-730)<2&&!pathosPrototype.state.rendering);
       const view=await page.locator('#hwView').boundingBox();
       const film=await page.evaluate(()=>({width:window.pathosPrototype.film.w,height:window.pathosPrototype.film.h}));
       check(Math.abs(film.width/film.height-16/9)<.05,`${config.name}: guided playback preserves the 16:9 film picture`);

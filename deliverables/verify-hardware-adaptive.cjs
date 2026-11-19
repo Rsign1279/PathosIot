@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
   const source=fs.readFileSync(path.join(__dirname,'../hardware-adaptive.js'),'utf8');
-  const {canProbeHardware,excellentHardware,createHardwareMonitor,sequencePair}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+  const {canProbeHardware,excellentHardware,createHardwareMonitor,sequencePair,advanceHardwareMotion}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
   let checks=0;const check=(value,message)=>{checks++;assert(value,message);};
   const capable={visible:true,width:1440,cores:12,memory:16};
   check(canProbeHardware(capable),'A capable foreground desktop may be measured');
@@ -33,5 +33,16 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   const gap=sequencePair(900,[0,479],[300,600,900]);
   check(gap.lo===gap.hi&&gap.alpha===0,'Missing frame ranges do not blend unrelated pictures');
   check(sequencePair(200,[],[300])===null,'No decoded frame leaves the current still intact');
+  const trajectories=[];
+  for(const hz of [30,60,120]){
+    let frame=0,velocity=0,previous=0;
+    for(let i=0;i<hz;i++){
+      ({frame,velocity}=advanceHardwareMotion(frame,velocity,100,1/hz));
+      check(frame>=previous&&frame<=100,'A stopped scroll settles without overshooting or reversing');previous=frame;
+    }
+    trajectories.push(frame);
+  }
+  check(Math.max(...trajectories)-Math.min(...trajectories)<1e-6,'Motion does not change speed with display refresh rate');
+  check(advanceHardwareMotion(0,100,80,.016,true).frame===80,'Reduced motion selects the requested pose directly');
   console.log(`${checks}/${checks} adaptive hardware policy and sequence checks passed.`);
 })().catch(error=>{console.error(error);process.exitCode=1;});

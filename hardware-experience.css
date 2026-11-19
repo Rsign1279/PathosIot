@@ -23,7 +23,7 @@
 #prototype .hw-skip-short{display:none}
 #prototype .hw-play svg{display:block;width:14px;height:14px}
 #prototype .hw-360[hidden]{display:none}
-#prototype .hw-view{position:absolute;inset:48px 0 0;height:auto;aspect-ratio:auto;min-height:0;touch-action:pan-y;background:var(--hw-bg)}
+#prototype .hw-view{position:absolute;inset:48px 0 0;height:auto;aspect-ratio:auto;min-height:0;touch-action:pan-y;background:#060607}
 #prototype .hw-hud{--serif:var(--font-editorial);--sans:var(--font-ui)}
 #prototype .hw-hud .hw-chapter>*{opacity:1!important}
 #prototype .hw-title{font-family:var(--font-editorial);font-weight:400;color:var(--hw-ink)}
