@@ -1,0 +1,41 @@
+/* The software and field stories fit the page, rather than pinning visitors
+   through several screens. Existing media and all captions remain available. */
+#device-tour.is-compact{height:auto;padding-bottom:var(--space-16,4rem)}
+#device-tour.is-compact .device-track{height:auto}
+#device-tour.is-compact .device-stage{position:relative;top:auto;height:auto;min-height:0;padding:var(--space-8,2rem) var(--gutter,1.5rem) 0;perspective:none}
+#device-tour.is-compact .device{width:min(60rem,100%);transform:none;will-change:auto;border-radius:var(--radius-panel,1.5rem)}
+#device-tour.is-compact .device-shadow{display:none}
+#device-tour.is-compact .device-meta{width:min(60rem,100%);margin-top:var(--space-6,1.5rem);gap:var(--space-4,1rem)}
+#device-tour.is-compact .device-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,8.5rem),1fr));width:100%;gap:var(--space-1,.25rem);box-shadow:none}
+#device-tour.is-compact .device-steps>li{min-width:0;display:flex}
+#device-tour.is-compact .step-btn{width:100%;height:auto;min-height:2.75rem;padding:.75rem;justify-content:center;white-space:normal;font-size:var(--text-sm,.875rem)!important;line-height:1.35;border-radius:var(--radius-control,.5rem)}
+#device-tour.is-compact .step-btn>span{font-size:var(--text-xs,.8125rem)}
+#device-tour.is-compact .device-captions{height:auto;min-height:0;max-width:44rem}
+#device-tour.is-compact .device-caption{position:static;inset:auto;height:auto;transform:none;font-size:var(--text-base,1rem)!important;line-height:1.55;opacity:1}
+#device-tour.is-compact .device-caption[hidden]{display:none}
+#device-tour.is-compact .screen-shot{transition:opacity var(--motion-base,240ms) ease;transform:none}
+
+#product.field.is-compact{padding-bottom:var(--space-16,4rem)}
+#product.field.is-compact .fl-track{height:auto}
+#product.field.is-compact .fl-stage{position:relative;top:auto;height:auto;min-height:0;width:min(100%,72rem);margin:0 auto;padding:var(--space-8,2rem) var(--gutter,1.5rem) 0;perspective:none;overflow:visible;cursor:auto;touch-action:pan-y pinch-zoom}
+#product.field.is-compact .fl-deck{--photo-height:clamp(16rem,55svh,34rem);position:relative;inset:auto;display:grid;place-items:center;height:var(--photo-height);list-style:none;margin:0;padding:0;pointer-events:auto;transform-style:flat}
+#product.field.is-compact .fl-card{position:relative;grid-area:1/1;inset:auto;left:auto;top:auto;width:100%;height:100%;margin:0;transform:none;transform-style:flat;will-change:auto;pointer-events:auto}
+#product.field.is-compact .fl-card[hidden]{display:none!important}
+#product.field.is-compact .fl-front.shot{position:relative;inset:auto;display:flex;justify-content:center;align-items:center;width:100%;height:100%;min-height:0;max-height:none;margin:0;padding:0;border:0;border-radius:var(--radius-panel,1.5rem);background:transparent;box-shadow:none;cursor:zoom-in;transform:none;overflow:hidden}
+#product.field.is-compact .fl-front.shot img{position:relative;inset:auto;width:min(100%,calc(var(--photo-height)*var(--photo-ratio,.8)));max-width:100%;height:auto;max-height:100%;aspect-ratio:auto;object-fit:contain;border-radius:var(--radius-panel,1.5rem)}
+#product.field.is-compact .fl-front.shot::after,#product.field.is-compact .fl-back{display:none}
+#product.field.is-compact .fl-ui{position:relative;inset:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-6,1.5rem);width:100%;margin:var(--space-6,1.5rem) auto 0;pointer-events:auto}
+#product.field.is-compact .fl-caption{min-height:7rem;max-width:46ch;animation:none}
+#product.field.is-compact .fl-caption strong{font-family:var(--font-ui,'Space Grotesk',sans-serif);font-size:var(--text-lg,1.125rem);line-height:1.35}
+#product.field.is-compact .fl-caption>span{font-size:var(--text-base,1rem);line-height:1.55}
+#product.field.is-compact .fl-nav{gap:8px;justify-content:center;max-width:100%}
+#product.field.is-compact .fl-count{min-width:0;flex:1 1 auto;font-size:var(--text-sm,.875rem)}
+#product.field.is-compact .fl-btn{display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px}
+@media(max-width:640px){
+  #device-tour.is-compact .step-btn{justify-content:flex-start}
+  #product.field.is-compact .fl-ui{grid-template-columns:minmax(0,1fr);gap:var(--space-4,1rem)}
+  #product.field.is-compact .fl-nav{justify-content:space-between}
+}
+@media(prefers-reduced-motion:reduce){
+  #device-tour.is-compact .screen-shot{transition:none}
+}

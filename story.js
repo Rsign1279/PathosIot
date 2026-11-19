@@ -13,9 +13,8 @@
    Animations run on every device.
    ========================================================================== */
 
-// Animations run on every device, including when the system asks for reduced
-// motion (school laptops often ship with animations off). Founder's decision.
-const reduced = false;
+// Reduced motion uses the complete static chart and direct tutorial steps.
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const ease = x => 1 - Math.pow(1 - clamp(x, 0, 1), 3);
@@ -285,7 +284,8 @@ for (const d of document.querySelectorAll('.faq-item')) {
     if (reduced) return;
     e.preventDefault();
     anim?.cancel();
-    const opts = { duration: 320, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)' };
+    const motion=getComputedStyle(document.documentElement);
+    const opts={duration:parseFloat(motion.getPropertyValue('--motion-base'))||240,easing:motion.getPropertyValue('--ease').trim()||'ease-out'};
     if (d.open) {
       anim = ans.animate([{ height: ans.offsetHeight + 'px', opacity: 1 }, { height: '0px', opacity: 0 }], opts);
       d.classList.add('is-closing');

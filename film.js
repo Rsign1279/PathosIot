@@ -8,8 +8,19 @@ const bar = document.getElementById('filmScrub');
 if (stage && video) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let onScreen = false, near = false, prepared = false, userPaused = false;
-  let internalPause = false, blocked = false, pending = false, attempt = 0;
+  let internalPause = false, blocked = false, pending = false, attempt = 0, motionOverride = false;
   let frame = 0, videoFrame = false, retryTimer = 0, retries = 0;
+  const scrub = bar?.parentElement;
+  const seek = scrub ? document.createElement('input') : null;
+  if (seek) {
+    seek.type = 'range';seek.className = 'film-seek';
+    seek.min = '0';seek.max = '1000';seek.step = '1';seek.value = '0';seek.disabled = true;
+    seek.setAttribute('aria-label', 'Seek in project film');
+    seek.setAttribute('aria-controls', video.id);
+    scrub.removeAttribute('aria-hidden');
+    bar.setAttribute('aria-hidden', 'true');
+    scrub.append(seek);stage.classList.add('film-stage--seekable');
+  }
 
   video.muted = true;
   video.loop = true;
@@ -18,13 +29,31 @@ if (stage && video) {
   video.preload = 'none';
   video.setAttribute('aria-label', 'Pathos IoT in 44 seconds');
 
-  const eligible = () => prepared && onScreen && !document.hidden && !reduced.matches && !userPaused && !blocked;
+  const eligible = () => prepared && onScreen && !document.hidden && (!reduced.matches || motionOverride) && !userPaused && !blocked;
   const clearRetry = () => { clearTimeout(retryTimer); retryTimer = 0; };
+  const timeLabel = value => {
+    const seconds = Math.max(0, Math.floor(value));
+    return seconds < 60 ? `${seconds} seconds` : `${Math.floor(seconds / 60)} minutes ${seconds % 60} seconds`;
+  };
   const drawBar = () => {
-    if (bar && Number.isFinite(video.duration) && video.duration > 0) {
-      bar.style.transform = `scaleX(${Math.min(1, video.currentTime / video.duration).toFixed(4)})`;
+    const available = Number.isFinite(video.duration) && video.duration > 0;
+    if (seek) seek.disabled = !available;
+    if (bar && available) {
+      const progress = Math.max(0, Math.min(1, video.currentTime / video.duration));
+      bar.style.transform = `scaleX(${progress.toFixed(4)})`;
+      if (seek) {
+        seek.value = String(Math.round(progress * 1000));
+        seek.style.setProperty('--seek-progress', `${(progress * 100).toFixed(2)}%`);
+        const label = `${timeLabel(video.currentTime)} of ${timeLabel(video.duration)}`;
+        if (seek.getAttribute('aria-valuetext') !== label) seek.setAttribute('aria-valuetext', label);
+      }
     }
   };
+  seek?.addEventListener('input', () => {
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    video.currentTime = Math.min(video.duration, Math.max(0, Number(seek.value) / 1000 * video.duration));
+    drawBar();
+  });
   const stopDraw = () => {
     if (!frame) return;
     if (videoFrame) video.cancelVideoFrameCallback(frame);
@@ -65,7 +94,7 @@ if (stage && video) {
     Promise.resolve(video.play()).then(() => {
       if (currentAttempt !== attempt) return;
       pending = false;
-      if (!onScreen || document.hidden || reduced.matches) pause();
+      if (!eligible()) pause();
     }).catch(error => {
       if (currentAttempt !== attempt) return;
       pending = false;
@@ -86,7 +115,7 @@ if (stage && video) {
   };
   const update = () => {
     prepare();
-    if (!onScreen || document.hidden || reduced.matches) pause();
+    if (!onScreen || document.hidden || (reduced.matches && !motionOverride)) pause();
     else tryPlay();
   };
 
@@ -101,8 +130,12 @@ if (stage && video) {
     update();
   }, { threshold: 0.15 }).observe(stage);
   document.addEventListener('visibilitychange', update);
-  reduced.addEventListener ? reduced.addEventListener('change', update) : reduced.addListener(update);
+  const motionChanged = () => { motionOverride = false; update(); };
+  reduced.addEventListener ? reduced.addEventListener('change', motionChanged) : reduced.addListener(motionChanged);
   video.addEventListener('play', () => {
+    // Native play is a deliberate opt-in even when motion is reduced. Calls
+    // from our automatic scheduler already have a pending attempt.
+    if (!pending) motionOverride = true;
     userPaused = false;
     blocked = false;
     prepared = true;
@@ -125,5 +158,6 @@ if (stage && video) {
   video.addEventListener('timeupdate', () => { retries = 0; clearRetry(); drawBar(); });
   video.addEventListener('seeked', drawBar);
   video.addEventListener('loadedmetadata', drawBar);
+  video.addEventListener('durationchange', drawBar);
   video.addEventListener('error', () => { blocked = true; clearRetry(); stopDraw(); });
 }

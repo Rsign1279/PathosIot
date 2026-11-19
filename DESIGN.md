@@ -1,5 +1,50 @@
 # Pathos IoT design record
 
+## Accessibility and adaptive hardware revision
+
+The external review was checked against the rendered current site by a council
+covering media, forms/navigation, compact stories, hardware runtime, hardware
+interface, and independent browser design QA. The six-font partner claim was
+stale: the strip already used two local families. Raw counts of historical CSS
+values were treated as maintenance evidence, not proof that every rule was
+visible or wrong.
+
+The active interface now consumes `design-tokens.css`: shared palette, root-
+relative type, spacing, focus, targets, radii and 160–300ms interaction timings.
+The CSS compiler also converts legacy HTML font declarations to `rem`; canvas
+geometry remains pixels. Enlarged type causes intrinsic grids to reflow rather
+than reducing text or clipping it. Navigation uses matching 640/900/1100px
+layout boundaries, with a shorter landscape header. Genuine inline prose links
+are exempt from the standalone 44px target rule.
+
+A dark floor under the hero preserves the marble while making its gold words
+readable across sampled video frames. Surface-aware focus colors share one
+3px/3px ring geometry. A visible film control respects deliberate pause and
+reduced motion. The project film's former decorative progress line is a native
+keyboard range control. Form summaries now update as fields are corrected;
+pointer navigation does not focus whole sections. Reusable SVG controls replace
+decorative arrow characters in the interactive controls.
+
+Software screens and field photographs use direct controls instead of pinned
+scroll runs. The hardware player is a compact two-column section on wide screens
+and a natural stacked section on phones. Guided Visual and 3D Walkthrough tabs
+sit above the picture, with explicit play, a timeline and all ten chapters.
+Guided starts first with a bounded pre-rendered cache. The existing samples
+contain a 1280 × 720 picture; native 3D retains its Full HD minimum. Auto-promotion
+requires measured excellent performance of the actual full-resolution model,
+never just a memory hint. Sustained lag, graphics failure or loading timeout
+returns to Guided with truthful selected tabs. Manual choices invalidate pending
+automatic decisions. Checks stay in the browser and send no performance data.
+
+Both landing and standalone hardware pages share the generated player. The
+share image uses outlined Fraunces and Space Grotesk from the site's local
+licensed files, so host font substitutions cannot change its appearance.
+
+Verification covers portrait, landscape, fallback, keyboard, reduced motion,
+200% text, zoom layout, sampled hero contrast, async mode races, failed assets,
+and context loss. Browser graphics tests run on software rendering here; a real
+mid-range phone and physical GPU measurement remain an external validation step.
+
 ## Hardware edges and lossless loading frame · November 16, 2026
 
 The hardware renderer retains MSAA on every device and raises oblique texture

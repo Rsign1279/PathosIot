@@ -55,7 +55,14 @@ commit `6cfb566` so content preservation is directly auditable.
 - `integration.css`: the new typography, palette, scoped planet layouts,
   responsive reading layout, and shared visual refinements.
 - `integrated.css`: the existing styles plus the integration layer in one
-  request. Regenerate it after changing a source stylesheet.
+  request. Regenerate it after changing a source stylesheet. The build converts
+  legacy pixel type sizes to `rem`; drawing dimensions stay in pixels.
+- `design-tokens.css` and `ui-system.css`: shared colors, scalable type,
+  spacing, focus, touch targets, button states, and motion. Active layout
+  boundaries are 640px, 900px and 1100px. Component-specific picture fitting
+  remains separate from navigation behavior.
+- `compact-layout.css`: direct software and photo controls replace the long
+  pinned scroll tracks while retaining all four screens and six photographs.
 - `integration.js`: one shared optional WebGL planet across two passages.
   One scroll-derived angle drives both its rotation and each original content
   row's emergence. Text remains normal HTML with its original UI behavior.
@@ -65,10 +72,19 @@ commit `6cfb566` so content preservation is directly auditable.
   material-anchored logo engraving with recessed, light-catching bevels.
 - `brand.css` and `assets/brand/`: the supplied Pathos IoT identity, rebuilt
   as crisp vectors for navigation, footer, icons and social previews.
-- `prototype-loader.js`: prepares the original in-page hardware study one
-  viewport ahead. Playback uses the original 2 MB model and full texture
-  sources on every device, at Full HD or native density when sharper. It downloads no
-  pre-rendered frame sequence by default.
+- `prototype-loader.js`: prepares guided frames one viewport ahead. Guided is
+  the first mode, using the existing 1280 × 720 picture samples with a bounded
+  six-frame mobile or ten-frame desktop cache and three concurrent requests.
+- `hardware-adaptive.js`: conservative, browser-local playback policy. Hardware
+  hints can veto a probe; only a benchmark of the actual full-resolution scene
+  can enable automatic 3D. Software rendering, reduced motion, coarse pointers,
+  saving data, and uncertain performance keep Guided. No analytics are sent.
+- `hardware-experience.js` and `.css`: compact Guided Visual / 3D Walkthrough
+  tabs, explicit playback, timeline, and ten chapter controls. Manual input wins
+  over pending automatic decisions. Sustained lag or graphics loss returns to
+  Guided at the same film position. Stale requests and a 45-second loading
+  timeout cannot reactivate 3D. Both the landing and standalone hardware page
+  use the same generated section.
 - `hardware-quality.js`: gives the actual Blender picture a 1920 × 1080
   minimum, measured inside its letterboxed view, while retaining sharper native
   density. Extreme drawing buffers remain bounded to 8 Mi pixels and the GPU's
@@ -77,8 +93,9 @@ commit `6cfb566` so content preservation is directly auditable.
   on the laptop's oblique display textures.
   Large drawing buffers are released when hidden or offscreen and restored
   before the study returns; the model stays ready without another download.
-- `hero.js` and `film.js`: preserve the real films, with deferred loading,
-  visibility pauses, controls, and reduced-motion alternatives.
+- `hero.js`, `film.js` and `media-controls.css`: preserve the real films, with
+  deferred loading, visible background-film pause, a keyboard-accessible seek
+  range, visibility pauses, and reduced-motion alternatives.
 - `assets/pathos-hardware-poster.webp`: a native 1920 × 1080 lossless render
   of the original film's first frame. It switches directly to the ready 3D
   image without a crossfade that could ghost moving parts. Rebuild it with
@@ -105,8 +122,10 @@ Branding changes preserve original media, technical model identifiers and the
 archived content baseline.
 
 To rebuild the brand assets, install `@resvg/resvg-js` outside this site in
-`../brand-tools`, then run `node deliverables/build-brand.cjs`. This development
-dependency is not shipped to visitors. Rebuild the integrated page with
+`../brand-tools`, and install Python `fonttools[woff]`. Then run
+`node deliverables/build-brand.cjs`. The social image outlines the same local
+Fraunces and Space Grotesk fonts used by the site, rather than relying on host
+fonts. These development dependencies are not shipped to visitors. Rebuild the integrated page with
 `node deliverables/build-integrated.cjs` and auxiliary page branding with
 `node deliverables/apply-brand.cjs`.
 
@@ -118,6 +137,7 @@ node deliverables/verify-integrated.cjs
 node deliverables/verify-orbit-motion.cjs
 node deliverables/verify-brand.cjs
 node deliverables/verify-hardware.cjs
+node deliverables/verify-hardware-adaptive.cjs
 ```
 
 The audit compares every original section's text and content collections,
@@ -137,12 +157,15 @@ far-side occlusion, then exercises both passages and graphics context recovery
 at desktop and mobile widths. Serve the page on port 3000 first, or set
 `PATHOS_QA_URL`; `PATHOS_CHROMIUM_PATH` optionally selects a browser executable.
 
-With Playwright available to Node, `node deliverables/verify-hardware-browser.cjs`
-checks real native-resolution rendering, chapter seeking, 360 and zoom, idle
-rendering, offscreen buffer release and full-resolution return at desktop 2×
-and mobile 3× pixel density. It saves screenshots in the OS temporary folder
-unless `PATHOS_QA_OUTPUT` is set. These emulate layouts on the test computer;
-they do not measure every phone or GPU.
+With Playwright available, `node deliverables/verify-design-browser.cjs` checks
+phone, landscape, tablet, desktop, zoom layout, 200% text, reduced motion,
+touch targets, focus and sampled video contrast. `node deliverables/verify-hardware-browser.cjs`
+checks guided defaults, no-WebGL and failed-frame fallbacks, chapters, seek,
+playback, truthful tabs and async loading failures. Use `HW_QA_3D=1` for the
+slower native-model/orbit/context-loss checks. Screenshots go to the temporary
+folder unless `PATHOS_QA_OUTPUT` is set. Browser software rendering checks
+correctness; actual mid-range phone and physical GPU performance still need
+real-device measurement.
 
 `deliverables/verify-experience.cjs` belongs to the preserved standalone
 edition; use the integrated audit on this branch.

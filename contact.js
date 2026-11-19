@@ -46,7 +46,7 @@ export function initContact() {
   form.noValidate = true;
   const initialButtonMarkup = submit.innerHTML;
   const fields = Array.from(form.querySelectorAll('input[required], select[required], textarea[required]'));
-  let sending = false;
+  let sending = false, validationStarted = false;
 
   const announce = (message, state) => {
     status.textContent = message;
@@ -72,9 +72,22 @@ export function initContact() {
     setError(field, valid ? '' : message);
     return valid;
   };
+  const updateValidationSummary = () => {
+    const invalid = fields.filter(field => field.getAttribute('aria-invalid') === 'true');
+    if (invalid.length) {
+      const message = invalid.length === 1 ? 'One field needs attention.' : `${invalid.length} fields need attention.`;
+      if (status.textContent !== message || status.hidden) announce(message, 'error');
+    } else {
+      status.hidden = true;
+      status.textContent = '';
+      status.classList.remove('error');
+    }
+  };
   fields.forEach(field => {
     field.addEventListener(field.tagName === 'SELECT' ? 'change' : 'input', () => {
-      if (field.getAttribute('aria-invalid') === 'true') validate(field);
+      if (!validationStarted) return;
+      validate(field);
+      updateValidationSummary();
     });
   });
 
@@ -83,13 +96,15 @@ export function initContact() {
     if (sending) return;
     const invalid = fields.filter(field => !validate(field));
     if (invalid.length) {
-      announce(invalid.length === 1 ? 'One field needs attention.' : `${invalid.length} fields need attention.`, 'error');
+      validationStarted = true;
+      updateValidationSummary();
       invalid[0].focus();
       return;
     }
 
     const data = Object.fromEntries(new FormData(form));
     if (data._honey) return;
+    validationStarted = false;
     const payload = {
       name: (data.name || '').trim(),
       email: (data.email || '').trim(),

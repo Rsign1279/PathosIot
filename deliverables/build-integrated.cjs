@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
 const {applyBrand}=require('./apply-brand.cjs');
+const {prepareStylesheet}=require('./design-system.cjs');
 const root = path.resolve(__dirname, '..');
 const originalPath = path.join(__dirname, 'original-page.html');
 if (!fs.existsSync(originalPath)) fs.writeFileSync(originalPath, cp.execFileSync('git', ['show', '6cfb566:index.html'], { cwd: root }));
@@ -50,6 +51,58 @@ for (const group of groups) {
   html=html.slice(0,start)+`<div class="planet-story" id="${group.id}" data-planet-story="${group.number}">\n${stage(group)}\n<div class="planet-content">\n${body}\n</div>\n</div>`+html.slice(end);
 }
 
+// The hardware study keeps its original chapters and model controls, in a
+// compact player that can be watched or scrubbed without a pinned scroll trap.
+const hardwareStart=html.indexOf('<section id="prototype"');
+const hardwareEnd=html.indexOf('</section>',hardwareStart)+'</section>'.length;
+if(hardwareStart<0||hardwareEnd<hardwareStart)throw new Error('Original hardware study missing');
+let hardware=html.slice(hardwareStart,hardwareEnd);
+const originalHeader=/<header\b[^>]*prototype-head[^>]*>[^]*?<\/header>/.exec(hardware)?.[0];
+if(!originalHeader)throw new Error('Original hardware heading missing');
+let hardwareTrack=hardware.slice(hardware.indexOf('<div class="hw-track"'),hardware.lastIndexOf('</section>')).trim();
+const hudStart=hardwareTrack.indexOf('<div class="hw-hud"');
+const divs=/<\/?div\b[^>]*>/g;divs.lastIndex=hudStart;
+let depth=0,hudEnd=-1,token;
+while((token=divs.exec(hardwareTrack))){depth+=token[0].startsWith('</')?-1:1;if(depth===0){hudEnd=divs.lastIndex;break;}}
+if(hudStart<0||hudEnd<0)throw new Error('Original hardware chapter detail missing');
+let hardwareHud=hardwareTrack.slice(hudStart,hudEnd),chapterIndex=0;
+hardwareHud=hardwareHud.replace(/<article class="hw-chapter[^\"]*"/g,tag=>tag+` data-hw-current="${chapterIndex++===0}"`);
+hardwareTrack=hardwareTrack.slice(0,hudStart)+hardwareTrack.slice(hudEnd);
+hardwareTrack=hardwareTrack.replace('<div class="hw-track" id="hwTrack">','<div class="hw-track" id="hwTrack" data-hw-compact="true">');
+hardwareTrack=hardwareTrack.replace('Loading the 3D model…','Preparing the guided visual…');
+hardwareTrack=hardwareTrack.replace('<nav class="hw-rail" id="hwRail" aria-label="Chapters"></nav>','');
+hardwareTrack=hardwareTrack.replace('Back to the film','Back to walkthrough');
+hardwareTrack=hardwareTrack.replace(/[ \t]+\n/g,'\n');
+const hardwareHeading=originalHeader.replace('Scroll to take it apart.','Play the guided visual, move the timeline, or explore the full 3D model.');
+hardware=`<section id="prototype" class="prototype hw-experience" aria-label="PATHOS hardware, two ways to explore" data-hw-renderer="guided">
+  <div class="wrap hw-experience-shell">
+    <div class="hw-experience-copy">
+      ${hardwareHeading}
+      <button type="button" class="hw-start" id="hwStart"><span id="hwStartText">Start walkthrough</span><span aria-hidden="true">→</span></button>
+      <p class="hw-experience-invite">Want a closer look? Switch to <button type="button" id="hwExplore3D">3D Walkthrough</button>.</p>
+      <p class="hw-mode-note" id="hwModeNote" role="status" aria-live="polite">Guided visual is ready to explore.</p>
+    </div>
+    <div class="hw-experience-main">
+      <div class="hw-mode-tabs" role="tablist" aria-label="Hardware viewing mode">
+        <button type="button" role="tab" id="hwGuidedTab" aria-selected="true" aria-controls="hwExperiencePanel" tabindex="0" data-hw-mode="guided">Guided Visual</button>
+        <button type="button" role="tab" id="hw3DTab" aria-selected="false" aria-controls="hwExperiencePanel" tabindex="-1" data-hw-mode="3d">3D Walkthrough</button>
+      </div>
+      <div class="hw-experience-panel" id="hwExperiencePanel" role="tabpanel" aria-labelledby="hwGuidedTab">
+        ${hardwareTrack}
+        <div class="hw-player-controls">
+          <button type="button" class="hw-play" id="hwPlay" aria-label="Play walkthrough"><span id="hwPlayIcon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5 13 8l-9 5.5Z"/></svg></span><span id="hwPlayText">Play</span></button>
+          <label class="hw-sr" for="hwSeek">Walkthrough position</label>
+          <input type="range" class="hw-seek" id="hwSeek" min="0" max="1000" step="1" value="0" aria-valuetext="Start of the walkthrough">
+          <output class="hw-time" id="hwTime" for="hwSeek">0:00 / 0:48</output>
+        </div>
+        ${hardwareHud}
+      </div>
+      <nav class="hw-rail" id="hwRail" aria-label="Walkthrough chapters"></nav>
+    </div>
+  </div>
+</section>`;
+html=html.slice(0,hardwareStart)+hardware+html.slice(hardwareEnd);
+
 html=html.replace(/    <link rel="preconnect" href="https:\/\/fonts\.[^\n]+\n/g,'');
 html=html.replace(/    <link href="https:\/\/fonts\.googleapis[^\n]+\n/g,'');
 html=html.replace(/    <link rel="stylesheet" href="(?:styles|prototype|field|play|story|system|film|flow|editorial)\.css">\r?\n/g,'');
@@ -64,11 +117,12 @@ html=html.replace('<form class="contact-form" id="contactForm" action="https://f
 const importerStart=html.indexOf('    <script type="module">',html.indexOf('src="hero.js"'));
 const importerEnd=html.indexOf('</script>',importerStart)+9;
 if(importerStart<0)throw new Error('Original hardware importer missing');
-html=html.slice(0,importerStart)+'    <script type="module" src="prototype-loader.js"></script>\n    <script type="module" src="integration.js"></script>\n    <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>'+html.slice(importerEnd);
+html=html.slice(0,importerStart)+'    <script type="module" src="prototype-loader.js"></script>\n    <script type="module" src="hardware-experience.js"></script>\n    <script type="module" src="integration.js"></script>\n    <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>'+html.slice(importerEnd);
 html=applyBrand(html);
 fs.writeFileSync(path.join(root,'index.html'),html);
+require('./sync-hardware-page.cjs').syncHardwarePage(html);
 
-const sheets=['styles.css','prototype.css','field.css','play.css','story.css','system.css','film.css','flow.css','editorial.css','integration.css','brand.css'];
-const css=sheets.map(name=>`\n/* ${name} */\n`+fs.readFileSync(path.join(root,name),'utf8')).join('\n');
+const sheets=['styles.css','prototype.css','field.css','play.css','story.css','system.css','film.css','flow.css','editorial.css','integration.css','brand.css','design-tokens.css','ui-system.css','compact-layout.css','hardware-experience.css','media-controls.css'];
+const css=sheets.map(name=>`\n/* ${name} */\n`+prepareStylesheet(fs.readFileSync(path.join(root,name),'utf8'))).join('\n');
 fs.writeFileSync(path.join(root,'integrated.css'),css);
 console.log(`Restored all 19 original sections. Scoped the planet to ${groups.reduce((n,g)=>n+g.chapters.length,0)} requested sections in two passages. One CSS request; ${Buffer.byteLength(css)} bytes before compression.`);

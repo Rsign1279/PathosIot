@@ -5,9 +5,13 @@
    (prototype.js) is loaded separately, only when it nears the viewport.
    ========================================================================== */
 
-// Animations run on every device, including when the system asks for reduced
-// motion (school laptops often ship with animations off). Founder's decision.
-const reduceMotion = false;
+import './ui-icons.js';
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+let reduceMotion = motionPreference.matches;
+motionPreference.addEventListener('change', event => {
+  reduceMotion = event.matches;
+  if (reduceMotion) document.querySelectorAll('[data-reveal]').forEach(el => el.classList.add('in'));
+});
 const raf = requestAnimationFrame;
 
 /* ---------- Nav ---------- */
@@ -235,6 +239,7 @@ function halftone(canvas, data, from, opts = {}) {
 
   function frame(now) {
     if (!started) { running = false; return; }
+    if (reduceMotion) { introDone = true; draw(2); canvas.classList.add('settled'); running = false; return; }
     const p = introDone ? 2 : (now - introStart) / 1000;
     if (!introDone && p >= 1.8) { introDone = true; canvas.classList.add('settled'); }
     displaced = (near() || displaced) ? physics() : false;
@@ -550,102 +555,52 @@ function initEdgeArt(arts) {
   }, { passive: true });
 }
 
-/* ---------- Device tour ----------
-   Scroll through the tall #device-tour section: the iPad tilts in, then turns
-   between screens, and the screenshot switches at the peak of each turn.
-   Targets are computed on scroll; a rAF loop eases toward them and stops once
-   settled, so nothing runs while the section is idle or off screen. */
-
+/* ---------- Software tour ----------
+   Four real screens selected directly, without a pinned page-scroll track. */
 function initDevice() {
-  const section = document.getElementById('device-tour');
-  const device = document.getElementById('device');
-  if (!section || !device) return;
-  // The heading sits above the tall track that holds the pinned stage, so
-  // scroll timing is measured on the track, not the whole section.
-  const track = document.getElementById('deviceTrack') || section;
-  const shots = Array.from(device.querySelectorAll('.screen-shot'));
-  const steps = Array.from(section.querySelectorAll('.step-btn'));
-  const caps = Array.from(section.querySelectorAll('.device-caption'));
-  const n = shots.length;
-  let index = 0;
-
-  function show(i) {
-    if (i === index) return;
-    index = i;
-    shots.forEach((el, k) => el.classList.toggle('is-on', k === i));
-    steps.forEach((el, k) => {
-      el.classList.toggle('is-on', k === i);
-      if (k === i) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current');
+  const section=document.getElementById('device-tour');
+  const device=document.getElementById('device');
+  if(!section||!device)return;
+  const shots=[...device.querySelectorAll('.screen-shot')];
+  const steps=[...section.querySelectorAll('.step-btn')];
+  const captions=[...section.querySelectorAll('.device-caption')];
+  if(!shots.length||!steps.length)return;
+  let index=-1;
+  section.classList.add('is-compact');
+  function show(value){
+    const selected=Math.max(0,Math.min(shots.length-1,Math.round(value)));
+    if(selected===index)return;
+    index=selected;
+    shots.forEach((shot,i)=>{
+      shot.classList.toggle('is-on',i===index);
+      shot.setAttribute('aria-hidden',String(i!==index));
     });
-    caps.forEach((el, k) => el.classList.toggle('is-on', k === i));
+    steps.forEach((button,i)=>{
+      button.classList.toggle('is-on',i===index);
+      button.setAttribute('aria-pressed',String(i===index));
+      if(i===index)button.setAttribute('aria-current','step');
+      else button.removeAttribute('aria-current');
+    });
+    captions.forEach((caption,i)=>{
+      caption.classList.toggle('is-on',i===index);
+      caption.hidden=i!==index;
+    });
   }
-
-  // Scroll range during which the stage is pinned.
-  const range = () => Math.max(1, track.offsetHeight - innerHeight);
-  const progress = () => Math.min(1, Math.max(0, -track.getBoundingClientRect().top / range()));
-
-  steps.forEach((btn, i) => btn.addEventListener('click', () => {
-    const top = track.getBoundingClientRect().top + scrollY + range() * ((i + 0.5) / n);
-    scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
-  }));
-
-  const smooth = t => t * t * (3 - 2 * t);
-  const cur = { rx: 0, ry: 0, rz: 0, s: 1 };
-  const tgt = { rx: 0, ry: 0, rz: 0, s: 1 };
-  let running = false, visible = false;
-
-  function computeTargets() {
-    const rect = track.getBoundingClientRect();
-    const vh = innerHeight;
-    // Entry: from first sight until the stage pins, the device tilts flat.
-    const enter = smooth(Math.min(1, Math.max(0, 1 - rect.top / vh)));
-    const p = progress();
-    const x = p * n;                               // 0..n across the screens
-    show(Math.min(n - 1, Math.floor(x)));
-    // Turn around each boundary (1..n-1): peaks exactly when the screen switches.
-    let turn = 0;
-    for (let b = 1; b < n; b++) {
-      const d = Math.abs(x - b);
-      if (d < 0.42) turn = smooth(1 - d / 0.42) * (b % 2 ? 1 : -1);
-    }
-    tgt.rx = (1 - enter) * 26 + Math.abs(turn) * 4;
-    tgt.ry = turn * 18;
-    tgt.rz = (1 - enter) * -5 + turn * -1.2;
-    tgt.s = 0.9 + enter * 0.1 - Math.abs(turn) * 0.025;
-  }
-
-  function apply() {
-    device.style.setProperty('--rx', cur.rx.toFixed(2) + 'deg');
-    device.style.setProperty('--ry', cur.ry.toFixed(2) + 'deg');
-    device.style.setProperty('--rz', cur.rz.toFixed(2) + 'deg');
-    device.style.setProperty('--s', cur.s.toFixed(4));
-  }
-
-  function loop() {
-    let moving = false;
-    for (const k in cur) {
-      const d = tgt[k] - cur[k];
-      if (Math.abs(d) > 0.001) { cur[k] += d * 0.16; moving = true; } else cur[k] = tgt[k];
-    }
-    apply();
-    if (moving && visible) raf(loop); else running = false;
-  }
-
-  function onScroll() {
-    computeTargets();
-    if (reduceMotion) return;
-    if (!running && visible) { running = true; raf(loop); }
-  }
-
-  new IntersectionObserver(es => { visible = es[es.length - 1].isIntersecting; if (visible) onScroll(); },
-    { rootMargin: '200px 0px' }).observe(section);
-  addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', onScroll, { passive: true });
-
-  // Start in the tilted pose so the first frame matches the entry animation.
-  computeTargets();
-  if (!reduceMotion) Object.assign(cur, tgt);
-  apply();
+  steps.forEach((button,i)=>{
+    button.addEventListener('click',()=>show(i));
+    button.addEventListener('keydown',event=>{
+      let next;
+      if(event.key==='ArrowRight')next=(i+1)%steps.length;
+      if(event.key==='ArrowLeft')next=(i+steps.length-1)%steps.length;
+      if(event.key==='Home')next=0;
+      if(event.key==='End')next=steps.length-1;
+      if(next===undefined)return;
+      event.preventDefault();show(next);steps[next].focus();
+    });
+  });
+  for(const [property,value] of Object.entries({'--rx':'0deg','--ry':'0deg','--rz':'0deg','--s':'1'}))device.style.setProperty(property,value);
+  show(0);
+  window.pathosDevice={goTo:show,get state(){return{index,count:shots.length};}};
 }
 
 /* ---------- Images + lightbox ---------- */
@@ -740,15 +695,18 @@ const FIELD_ERRORS = {
 function initContactForm() {
   const form = document.getElementById('contactForm');
   if (!form) return;
-  form.noValidate = true;
   const status = document.getElementById('formStatus');
   const button = form.querySelector('button[type="submit"]');
-  const label = button.textContent;
+  if (!status || !button) return;
+  form.noValidate = true;
+  const initialButtonMarkup = button.innerHTML;
+  let validationStarted = false;
   const fields = Array.from(form.querySelectorAll('input[required], select[required], textarea[required]'));
   const show = (msg, type) => { status.textContent = msg; status.className = `form-status ${type}`; status.hidden = false; };
   const setError = (f, msg) => {
     const err = document.getElementById(`${f.id}Error`);
-    f.setAttribute('aria-invalid', String(!!msg));
+    if (msg) f.setAttribute('aria-invalid', 'true');
+    else f.removeAttribute('aria-invalid');
     if (err) { err.textContent = msg || ''; err.hidden = !msg; }
   };
   const check = f => {
@@ -757,20 +715,38 @@ function initContactForm() {
     setError(f, ok ? '' : FIELD_ERRORS[f.name](f));
     return ok;
   };
-  // Once a field has been flagged, re-check it as the visitor fixes it.
-  fields.forEach(f => f.addEventListener(f.tagName === 'SELECT' ? 'change' : 'input', () => { if (f.getAttribute('aria-invalid') === 'true') check(f); }));
+  const updateValidationSummary = () => {
+    const invalid = fields.filter(f => f.getAttribute('aria-invalid') === 'true');
+    if (invalid.length) {
+      const message = invalid.length === 1 ? 'One field needs attention.' : `${invalid.length} fields need attention.`;
+      if (status.textContent !== message || status.hidden) show(message, 'error');
+    } else {
+      status.hidden = true;
+      status.textContent = '';
+      status.className = 'form-status';
+    }
+  };
+  // After the first validation attempt, both the inline errors and their
+  // summary follow corrections, including a field becoming invalid again.
+  fields.forEach(f => f.addEventListener(f.tagName === 'SELECT' ? 'change' : 'input', () => {
+    if (!validationStarted) return;
+    check(f);
+    updateValidationSummary();
+  }));
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (button.disabled) return;
     const invalid = fields.filter(f => !check(f));
     if (invalid.length) {
-      show(invalid.length === 1 ? 'One field needs attention.' : `${invalid.length} fields need attention.`, 'error');
+      validationStarted = true;
+      updateValidationSummary();
       invalid[0].focus();
       return;
     }
     const data = Object.fromEntries(new FormData(form));
     if (data._honey) return;                       // bots fill the hidden field
+    validationStarted = false;
     const payload = {
       name: data.name.trim(), email: data.email.trim(), organization: (data.organization || '').trim() || 'Not given',
       interest: data.interest, message: data.message.trim(),
@@ -791,7 +767,7 @@ function initContactForm() {
     } catch (_) {
       show('Your message could not be sent because the connection failed. Please try again, or email rsignsv1279@gmail.com.', 'error');
     } finally {
-      button.disabled = false; button.textContent = label;
+      button.disabled = false; button.innerHTML = initialButtonMarkup;
     }
   });
 }

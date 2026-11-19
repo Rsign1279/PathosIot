@@ -13,8 +13,8 @@
      through the four v1 screenshots on the film's frames, the wallpaper is the
      marble artwork, and the table carries the marble panel at the right edge
      of the frame during the opening and closing shots.
-   - Renders the original geometry at native display resolution, only when
-     something changes on screen. No film-sized decoded image cache.
+   - Guided playback uses a bounded nearby frame cache. Explicit or measured
+     live 3D retains the original geometry and Full HD picture resolution.
    ========================================================================== */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -22,6 +22,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { hardwareResolution } from './hardware-quality.js';
+import {canProbeHardware,excellentHardware,createHardwareMonitor,sequencePair} from './hardware-adaptive.js';
 
 const FPS = 60, FIRST = 1, LAST = 2880;
 // The film's frame: 16:9 on a 36 mm-wide sensor.
@@ -65,9 +66,9 @@ const SEQ = { step: 6, w: 1600, h: 800, fw: 1280, fh: 720, url: k => `./assets/h
 SEQ.n = Math.floor((LAST - FIRST) / SEQ.step) + 1;
 // ?bake renders frames for that sequence; nothing else runs.
 const BAKE = new URLSearchParams(location.search).has('bake') ? { w: SEQ.w, h: SEQ.h, s: 1.5 } : null;
-// The native 3D film is the default on every device. Keep the historical
-// sequence available only for explicit comparison, never as a quality tier.
-let USE_SEQ = !BAKE && window.__hwSequence === true;
+// Guided frames are the safe first view. Live 3D is either explicitly chosen
+// or promoted after measuring this exact scene at its intended resolution.
+let USE_SEQ = !BAKE;
 
 /* ---------- Film timing (from the Blender file) ---------- */
 
@@ -116,9 +117,10 @@ function progressAt(frame) {
 // moment it pins until the moment it releases.
 let pinTop = parseFloat(getComputedStyle(stage).top) || 0;
 addEventListener('resize', () => { pinTop = parseFloat(getComputedStyle(stage).top) || 0; });
-const scrollRange = () => Math.max(1, track.offsetHeight - stage.offsetHeight);
-const scrollProgress = () => clamp((pinTop - track.getBoundingClientRect().top) / scrollRange(), 0, 1);
-const scrollYForFrame = f => track.getBoundingClientRect().top + scrollY - pinTop + progressAt(f) * scrollRange() + 1;
+const compactStudy = () => track.dataset.hwCompact==='true';
+const scrollRange = () => compactStudy()?Math.max(1,stage.offsetHeight+innerHeight*.44):Math.max(1, track.offsetHeight - stage.offsetHeight);
+const scrollProgress = () => compactStudy()?clamp((innerHeight*.72-stage.getBoundingClientRect().top)/scrollRange(),0,1):clamp((pinTop - track.getBoundingClientRect().top) / scrollRange(), 0, 1);
+const scrollYForFrame = f => (compactStudy()?stage.getBoundingClientRect().top+scrollY-innerHeight*.72:track.getBoundingClientRect().top+scrollY-pinTop)+progressAt(f)*scrollRange()+1;
 
 /* ---------- Rail + scrubber ---------- */
 
@@ -129,11 +131,7 @@ const railButtons = chapters.map(c => {
   b.innerHTML = `<span class="n">${String(c.i + 1).padStart(2, '0')}</span><span class="l">${c.el.dataset.rail}</span>`;
   b.setAttribute('aria-label', `Chapter ${c.i + 1}: ${c.el.dataset.rail}`);
   b.addEventListener('click', () => {
-    // Land where the shot's titles are up (or a moment into a shot without titles).
-    const f = c.start ? Math.min(c.start + 40, c.end - 12) : c.shotStart + 40;
-    if (reduced) {
-      cur = tgt = f; dirty = true; wake();
-    } else scrollTo({ top: scrollYForFrame(f), behavior: 'smooth' });
+    selectChapter(c.i);
   });
   rail.appendChild(b);
   return b;
@@ -213,13 +211,122 @@ layoutFilm(view.clientWidth || 1, view.clientHeight || 1);
 const stats = { ready: false, frames: 0, drawCalls: 0, triangles: 0, quality: 0, model: MODEL, page: 0, gpu: '', low: false, shadow: 0 };
 let renderer, scene, camera, mixer;
 let cur = FIRST, tgt = FIRST, visible = false, dirty = true, raf = 0, last = 0;
+let playback=reduced?'paused':'scroll',manualInteracted=false,manualMode=false,requestedRenderer='guided',loading3D=false,modeReason='Preparing the guided visual…',lastStateEvent=-Infinity;
+let glPromise=null,benchmarking=false,benchmarkTicket=0,modeRequest=0,autoConsidered=false,autoTimer=0,contextLost=false;
+const pacing=createHardwareMonitor();
 let appliedFrame = NaN, renderWidth = 0, renderHeight = 0, renderRatio = 0, maxRenderDimension = 8192;
 const pickables = [];
 const actions = [];
 // 360 view: 'film' follows the Blender camera; 'orbit' is the visitor's own.
-let mode = 'film', orbit = null, orbitCam = null, tween = null, tweenCam = null, zoomGoal = 0;
+let mode = 'film', orbit = null, orbitCam = null, orbitHome=null,tween = null, tweenCam = null, zoomGoal = 0;
 const uFilm = { value: new THREE.Vector4(0, 0, 1, 1) }, uArt = { value: 1 };
 let screenMat = null, pageTex = [], shownPage = -1;
+let resourceGeneration=0;
+const ownedTextures=new Set();
+function disposeFailedGL(){
+  resourceGeneration++;
+  const geometries=new Set(),materials=new Set();
+  scene?.traverse(object=>{if(object.geometry)geometries.add(object.geometry);for(const material of [].concat(object.material||[])){materials.add(material);for(const value of Object.values(material))if(value?.isTexture)ownedTextures.add(value);}});
+  if(scene?.environment)ownedTextures.add(scene.environment);
+  for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();
+  for(const texture of ownedTextures)texture.dispose();ownedTextures.clear();
+  orbit?.dispose();renderer?.domElement.remove();renderer?.dispose();
+  renderer=null;scene=null;camera=null;mixer=null;orbit=null;orbitCam=null;screenMat=null;pageTex=[];actions.length=0;pickables.length=0;
+  renderWidth=renderHeight=renderRatio=0;stats.gl=false;stats.ready=seqDrawn;contextLost=false;
+}
+
+function stateSnapshot(){
+  const baked=USE_SEQ&&mode==='film'&&!tween;
+  return {frame:cur,target:tgt,chapter:activeChapter,visible,rendering:!!raf,page:baked?pageAt(Math.round(cur)):shownPage,art:baked?artAt(Math.round(cur)):uArt.value,mode,seq:USE_SEQ,tweening:!!tween,label:pinned?LABELS[pinned.obj.name][0]:null,
+    rendererMode:USE_SEQ?'guided':'3d',playback,progress:progressAt(cur),modeReason,loading3D,ready:USE_SEQ?seqDrawn:!!stats.gl};
+}
+function publish(force=false){
+  const now=performance.now();if(!force&&now-lastStateEvent<100)return;lastStateEvent=now;
+  syncCanvasAccess();
+  document.dispatchEvent(new CustomEvent('pathos:hardwarestate',{detail:stateSnapshot()}));
+}
+function syncCanvasAccess(){
+  if(!renderer)return;
+  const canvas=renderer.domElement,available=!USE_SEQ&&!contextLost&&visible&&!document.hidden;
+  canvas.tabIndex=available?0:-1;canvas.setAttribute('aria-hidden',String(!available));
+  canvas.setAttribute('aria-label',mode==='orbit'?'360 degree hardware model. Arrow keys rotate, plus and minus zoom, R resets, Escape returns to the walkthrough.':'Interactive 3D hardware model. Press Enter to open the 360 degree view.');
+  if(!available&&document.activeElement===canvas)document.getElementById(USE_SEQ?'hwGuidedTab':'hw3DTab')?.focus({preventScroll:true});
+}
+function markManual(){manualInteracted=true;benchmarkTicket++;benchmarking=false;clearTimeout(autoTimer);}
+function seek(progress,{manual=true}={}){
+  if(manual)markManual();playback='paused';cur=tgt=frameAt(clamp(Number(progress)||0,0,1));
+  if(mode==='orbit')exitOrbit();updateHud(cur);dirty=true;last=0;pacing.reset();wake();publish(true);
+}
+function selectChapter(index){
+  const c=chapters[clamp(Math.round(Number(index)||0),0,chapters.length-1)];
+  const frame=c.start?Math.min(c.start+40,c.end-12):c.shotStart+40;
+  seek(progressAt(frame));
+}
+function play(){markManual();if(mode==='orbit')exitOrbit();if(cur>=LAST-1)cur=tgt=FIRST;playback='play';last=0;dirty=true;wake();publish(true);}
+function pause(){markManual();playback='paused';tgt=cur;dirty=true;wake();publish(true);}
+function resetOrbit(){
+  mode='film';tween=null;if(orbit)orbit.enabled=false;
+  if(renderer)renderer.domElement.style.touchAction='pan-y';
+  stage.classList.remove('is-orbit');orbitBtn.setAttribute('aria-pressed','false');orbitUi.hidden=true;closeLabel();tip.hidden=true;
+}
+function guided(reason='Guided playback is ready.'){
+  benchmarkTicket++;modeRequest++;benchmarking=false;requestedRenderer='guided';loading3D=false;
+  resetOrbit();USE_SEQ=true;modeReason=!seqDrawn&&reason==='Guided playback is ready.'?'Preparing the guided visual…':reason;pacing.reset();last=0;
+  if(!seqCanvas)seqStart();
+  showLive(false);seqRequest(clamp((cur-FIRST)/SEQ.step,0,SEQ.n-1));
+  releaseDrawBuffer();orbitBtn.hidden=true;
+  stats.ready=seqDrawn;dirty=true;wake();publish(true);
+}
+function activate3D(reason){
+  if(!stats.gl||contextLost||renderer?.getContext().isContextLost()||requestedRenderer!=='3d')return;
+  USE_SEQ=false;loading3D=false;modeReason=reason;stats.ready=true;if(visible&&!document.hidden)resize();else releaseDrawBuffer();showLive(true);
+  orbitBtn.hidden=false;pacing.reset();last=0;dirty=true;wake();publish(true);
+}
+async function setRendererMode(value,{manual=true}={}){
+  if(value!=='guided'&&value!=='3d')return;
+  const request=++modeRequest;
+  if(manual){markManual();manualMode=true;}
+  if(value==='guided'){guided();return;}
+  requestedRenderer='3d';loading3D=true;modeReason='Loading interactive 3D…';publish(true);
+  let timer;
+  try{
+    await Promise.race([startGL(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('3D loading timed out')),45000);})]);
+    if(request===modeRequest&&requestedRenderer==='3d')activate3D('Interactive 3D is ready.');
+  }catch{if(request===modeRequest)guided('Interactive 3D is unavailable. Guided playback remains available.');}
+  finally{clearTimeout(timer);}
+}
+
+function considerAuto3D(){
+  if(autoConsidered||manualInteracted||manualMode||BAKE||!seqReady||!canProbeHardware({reduced,saveData:navigator.connection?.saveData,coarse:matchMedia('(pointer:coarse)').matches,cores:navigator.hardwareConcurrency,memory:navigator.deviceMemory,width:innerWidth,visible:visible&&!document.hidden}))return;
+  autoConsidered=true;
+  autoTimer=setTimeout(()=>{if(!manualInteracted&&!manualMode&&visible&&!document.hidden)benchmark3D();},1500);
+}
+async function benchmark3D(){
+  const ticket=++benchmarkTicket;benchmarking=true;
+  const current=()=>ticket===benchmarkTicket&&!manualInteracted&&!manualMode&&visible&&!document.hidden&&!reduced;
+  try{
+    await startGL({probe:true});if(!current())return;
+    const gl=renderer.getContext();
+    if(/swiftshader|llvmpipe|software|microsoft basic/i.test(stats.gpu))return;
+    resize();const samples=[];let previous=0;
+    for(let index=0;index<52;index++){
+      const now=await new Promise(requestAnimationFrame);if(!current())return;
+      const startedAt=performance.now();
+      apply([150,460,780,1080,1360,1590,1820,2060,2350,2720][index%10]);
+      renderer.render(scene,camera);gl.finish();
+      const cost=performance.now()-startedAt;
+      if(cost>35||gl.getError()!==gl.NO_ERROR)return;
+      if(index>=4)samples.push({cost,interval:now-previous});previous=now;
+    }
+    stats.benchmark={samples:samples.length,excellent:excellentHardware(samples)};
+    if(current()&&stats.benchmark.excellent){requestedRenderer='3d';activate3D('Interactive 3D enabled after a smooth playback check.');}
+  }catch{/* Guided remains the working view when optional probing fails. */}
+  finally{
+    benchmarking=false;
+    if(renderer&&!contextLost){apply(cur);if(USE_SEQ)releaseDrawBuffer();}
+    updateHud(cur);dirty=true;wake();publish(true);
+  }
+}
 
 // Parts you can click: [name, what it does]. Keys are node names in the GLB.
 const LABELS = {
@@ -276,8 +383,12 @@ function resize() {
     film.zoom = SEQ.h / SEQ.fh; film.w = SEQ.fw; film.h = SEQ.fh;
     film.x = (w - film.w) / 2; film.y = (h - film.h) / 2; film.lift = 0;
   }
-  if (USE_SEQ) seqResize(w, h);
-  if (!renderer) return;
+  if (seqCanvas) seqResize(w, h);
+  // The renderer exists while the GLB is still loading; its camera does not.
+  // Guided layout can resize immediately, but live projection waits for init.
+  if (!renderer||!camera) return;
+  if(!BAKE&&!benchmarking&&(!visible||document.hidden)){releaseDrawBuffer();return;}
+  if(USE_SEQ&&!benchmarking&&!loading3D&&!BAKE){releaseDrawBuffer();return;}
   const resolution = hardwareResolution(w, h, devicePixelRatio || 1, maxRenderDimension, film.w, film.h);
   const ratio = BAKE ? BAKE.s : resolution.ratio;
   // Repeated resize notifications must not reallocate the same GPU buffers.
@@ -341,7 +452,7 @@ function apply(frame) {
   if (lensAt(fi) !== shownLens) setLens(lensAt(fi));
   showPage(pageAt(fi));
   uArt.value = artAt(fi);
-  updateHud(frame);
+  if(!benchmarking)updateHud(frame);
 }
 
 /* ---------- 360 view ---------- */
@@ -378,6 +489,7 @@ const activeCam = () => (tween ? tweenCam : mode === 'orbit' ? orbitCam : camera
 
 function enterOrbit() {
   if (mode === 'orbit' || !orbit) return;
+  markManual();playback='paused';tgt=cur;
   closeLabel();
   const from = filmPose();
   // Start the orbit exactly where the film camera is, looking at the same
@@ -391,6 +503,7 @@ function enterOrbit() {
   orbit.target.copy(from.p).addScaledVector(fwd, clamp(dist, orbit.minDistance, orbit.maxDistance));
   orbit.update();
   zoomGoal = orbitCam.position.distanceTo(orbit.target);
+  orbitHome={position:orbitCam.position.clone(),target:orbit.target.clone()};
   const to = { p: orbitCam.position.clone(), q: orbitCam.quaternion.clone() };
   mode = 'orbit';
   orbit.enabled = true;
@@ -399,7 +512,7 @@ function enterOrbit() {
   orbitBtn.setAttribute('aria-pressed', 'true');
   orbitUi.hidden = false;
   startTween(from, () => to);
-  wake();
+  wake();publish(true);
 }
 function exitOrbit() {
   if (mode !== 'orbit') return;
@@ -413,7 +526,7 @@ function exitOrbit() {
   orbitUi.hidden = true;
   // Glide back to wherever the film camera is now.
   startTween(from, filmPose);
-  wake();
+  wake();publish(true);
 }
 
 /* ---------- Click labels ---------- */
@@ -455,14 +568,18 @@ function labelFor(obj) {
 function render(now) {
   raf = 0;
   if (!visible || document.hidden) return;
-  const dt = Math.min(0.1, (now - (last || now)) / 1000);
+  const interval=last?now-last:0;
+  const dt = Math.min(0.1, interval / 1000);
   last = now;
 
-  if (!reduced) tgt = frameAt(scrollProgress());
+  if(playback==='play'&&mode==='film'){
+    tgt=Math.min(LAST,tgt+dt*FPS);
+    if(tgt===LAST){playback='paused';publish(true);}
+  }else if (!reduced&&playback==='scroll') tgt = frameAt(scrollProgress());
   const k = reduced ? 1 : 1 - Math.exp(-dt * 11);
   cur += (tgt - cur) * k;
   if (Math.abs(tgt - cur) < 0.08) cur = tgt;
-  let moving = cur !== tgt;
+  let moving = cur !== tgt||playback==='play';
   if (mode === 'orbit' && orbit) {
     syncProjection(orbitCam);
     // Zoom buttons ease the distance; damping keeps every move gentle.
@@ -477,8 +594,8 @@ function render(now) {
   if (stepTween(dt)) moving = true;
   // With the pre-rendered film, the live scene only draws in the 360 view and
   // while gliding into or out of it.
-  const live = !!renderer && (!USE_SEQ || mode === 'orbit' || !!tween);
-  if (USE_SEQ) showLive(live);
+  const live = !!renderer&&!contextLost&&!USE_SEQ;
+  showLive(live);
 
   if ((moving || dirty) && !live) {
     updateHud(cur);
@@ -487,6 +604,7 @@ function render(now) {
     if (pinned && mixer) { apply(cur); placeLabel(); }
     dirty = false;
   } else if (moving || dirty) {
+    const startedAt=performance.now();
     apply(cur);
     placeLabel();
     renderer.render(scene, activeCam());
@@ -494,40 +612,52 @@ function render(now) {
     stats.drawCalls = renderer.info.render.calls;
     stats.triangles = renderer.info.render.triangles;
     dirty = false;
+    if(!BAKE&&interval&&pacing.sample(now,interval,performance.now()-startedAt)){
+      autoConsidered=true;guided('Switched to Guided to keep playback smooth.');
+    }
   }
-  if (moving) raf = requestAnimationFrame(render);
-  else last = 0;
+  publish();
+  if (moving&&!raf) raf = requestAnimationFrame(render);
+  else {last = 0;pacing.reset();publish(true);}
 }
 function wake() { if (!raf && visible && !document.hidden) raf = requestAnimationFrame(render); }
 function releaseDrawBuffer() {
-  if (!renderer || BAKE || USE_SEQ) return;
+  if (!renderer || BAKE || contextLost) return;
   // Keep the model for instant return, but surrender large color/depth/MSAA
   // buffers while nobody can see the study. CSS size stays unchanged.
   renderer.setSize(1, 1, false);
   renderWidth = renderHeight = renderRatio = 0;
   stats.bufferPixels = renderer.domElement.width * renderer.domElement.height;
+  scene?.traverse(object=>{if(object.shadow?.map){object.shadow.map.dispose();object.shadow.map=null;}if(object.shadow?.mapPass){object.shadow.mapPass.dispose();object.shadow.mapPass=null;}});
+  renderer.shadowMap.needsUpdate=true;
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (raf) cancelAnimationFrame(raf);
     raf = 0; last = 0;
-    releaseDrawBuffer();
+    benchmarkTicket++;benchmarking=false;releaseDrawBuffer();pacing.reset();suspendSequence();last=0;
   } else {
-    if (visible && renderer && !renderWidth) resize();
+    if (visible && renderer && !renderWidth&&!USE_SEQ) resize();
     dirty = true; wake(); seqPump();
   }
+  publish(true);
 });
 
 /* ---------- Pre-rendered film ---------- */
 
-let seqCanvas = null, seqCtx = null, seqReady = false, seqDpr = 1, seqKey = '', liveShown = null;
-// Keep the decoder's memory bounded. The original whole-film preload retained
-// 480 decoded frames (~2.4 GB). Here at most 16 bitmaps and 3 in-flight loads
-// exist, and obsolete ImageBitmaps are explicitly released.
-const SEQ_CACHE_LIMIT = 16, SEQ_CONCURRENCY = 3;
+let seqCanvas = null, seqCtx = null, seqReady = false,seqDrawn=false, seqDpr = 1, seqKey = '', liveShown = null;
+// Never preload the whole film: keep six decoded images on phones or ten on
+// desktop, with three in-flight requests. Obsolete bitmaps are explicitly closed.
+const smallSequence=matchMedia('(max-width:640px)').matches;
+const SEQ_CACHE_LIMIT = smallSequence?6:10, SEQ_CONCURRENCY = 3,SEQ_PREFETCH=smallSequence?2:3;
 const seqImgs = new Map(), seqPending = new Map(), seqErrors = new Map();
 let seqWanted = [], seqCenter = -1, seqLoaded = 0, seqFailures = 0;
-let glStarted = false, pendingOrbit = false, pendingClick = null, pickAt = null;
+let pickAt = null;
+function suspendSequence(){
+  for(const controller of seqPending.values())controller.abort();
+  for(const [index,bitmap] of seqImgs)if(Math.abs(index-seqCenter)>1){bitmap.close?.();seqImgs.delete(index);}
+  stats.seqCached=seqImgs.size;
+}
 
 function seqRemember(k, bitmap) {
   seqImgs.set(k, bitmap);
@@ -548,7 +678,7 @@ function seqRequest(u) {
   // Required blend pair first; a short, nearby window follows. No background
   // sweep downloads the remainder of the film.
   const wanted = [Math.floor(u), Math.ceil(u), center];
-  for (let d = 1; d <= 4; d++) wanted.push(center + d, center - d);
+  for (let d = 1; d <= SEQ_PREFETCH; d++) wanted.push(center + d, center - d);
   seqWanted = [...new Set(wanted)].filter(k => k >= 0 && k < SEQ.n);
   for (const [k, controller] of seqPending) if (Math.abs(k - center) > 8) controller.abort();
   seqPump();
@@ -571,7 +701,8 @@ function seqPump() {
         if (controller.signal.aborted || Math.abs(k - seqCenter) > 8 || !USE_SEQ) { bitmap.close(); return; }
         seqRemember(k, bitmap);
         stats.seqLoaded = ++seqLoaded;
-        if (!seqReady) { seqReady = true; stats.ready = true; stage.classList.add('is-ready'); statusEl.hidden = true; }
+        if (!seqReady)seqReady=true;
+        considerAuto3D();
         seqKey = ''; dirty = true; wake();
       })
       .catch(error => {
@@ -589,17 +720,11 @@ function seqPump() {
 function seqResize(w, h) {
   if (!seqCanvas) return;
   seqDpr = Math.min(devicePixelRatio || 1, 1.5);
-  seqCanvas.width = Math.round(w * seqDpr);
-  seqCanvas.height = Math.round(h * seqDpr);
+  const width=Math.round(w*seqDpr),height=Math.round(h*seqDpr);
+  if(seqCanvas.width===width&&seqCanvas.height===height)return;
+  seqCanvas.width=width;seqCanvas.height=height;seqDrawn=false;
+  if(USE_SEQ){stats.ready=false;stage.classList.remove('is-ready');}
   seqKey = ''; dirty = true; wake();
-}
-function nearestLoaded(u, dir) {
-  let nearest = -1;
-  for (const k of seqImgs.keys()) {
-    if (dir < 0 && k <= u && k > nearest) nearest = k;
-    if (dir > 0 && k >= u && (nearest < 0 || k < nearest)) nearest = k;
-  }
-  return nearest;
 }
 // Draws the two samples either side of frame f, blended, with the image's
 // film frame on the view's film frame; edges feather into the backdrop.
@@ -607,11 +732,9 @@ function drawSeq(f) {
   if (!seqCtx) return;
   const u = clamp((f - FIRST) / SEQ.step, 0, SEQ.n - 1);
   seqRequest(u);
-  let lo = nearestLoaded(u, -1), hi = nearestLoaded(u, 1);
-  if (lo < 0 && hi < 0) return;
-  if (lo < 0) lo = hi;
-  if (hi < 0) hi = lo;
-  const a = hi === lo ? 0 : (u - lo) / (hi - lo);
+  const pair=sequencePair(f,seqImgs.keys(),chapters.slice(1).map(chapter=>chapter.shotStart),FIRST,SEQ.step);
+  if(!pair)return;
+  const {lo,hi,alpha:a}=pair;
   const key = `${lo}:${hi}:${a.toFixed(3)}:${seqCanvas.width}x${seqCanvas.height}`;
   if (key === seqKey) return;
   seqKey = key;
@@ -634,6 +757,7 @@ function drawSeq(f) {
   if (ix + iw < W) edge(ix + iw, 0, ix + iw - e, 0, ix + iw - e, iy, e, ih);
   if (iy > 0) edge(0, iy, 0, iy + e, ix, iy, iw, e);
   if (iy + ih < H) edge(0, iy + ih, 0, iy + ih - e, ix, iy + ih - e, iw, e);
+  if(!seqDrawn){seqDrawn=true;stats.ready=true;if(modeReason==='Preparing the guided visual…')modeReason='Guided playback is ready.';stage.classList.remove('is-static');stage.classList.add('is-ready');statusEl.hidden=true;publish(true);}
 }
 function showLive(on) {
   if (on === liveShown) return;
@@ -644,64 +768,58 @@ function showLive(on) {
 }
 // The live scene, built only when someone asks for it: a click on the
 // picture (labels, then part names on hover) or the 360 view.
-function startGL() {
-  if (glStarted) return;
-  glStarted = true;
-  if (USE_SEQ) { statusEl.textContent = 'Loading the 3D model…'; statusEl.hidden = false; }
-  init().catch(err => {
-    console.warn('PATHOS 3D (live) unavailable:', err.message);
-    if (USE_SEQ) { orbitBtn.hidden = true; pendingOrbit = false; pendingClick = null; }
-    else fail('The interactive model could not load, so this is a still of it. The titles still follow your scroll.');
-  });
+function startGL({probe=false}={}) {
+  if(stats.gl&&!contextLost)return Promise.resolve();
+  if(glPromise)return glPromise;
+  if(contextLost)return Promise.reject(new Error('3D context is unavailable'));
+  glPromise=init({probe}).catch(error=>{
+    console.warn('Pathos 3D unavailable:',error.message);
+    disposeFailedGL();throw error;
+  }).finally(()=>{glPromise=null;});
+  return glPromise;
 }
 function seqFail() {
   if (!USE_SEQ || seqReady) return;
-  console.warn('PATHOS 3D: pre-rendered film unavailable, rendering live');
-  USE_SEQ = false;
-  seqCanvas?.remove(); seqCanvas = seqCtx = null;
-  startGL();
+  modeReason='Guided frames could not load. The still remains available; retry a chapter or choose 3D.';
+  statusEl.textContent=modeReason;statusEl.hidden=false;stage.classList.add('is-static');publish(true);
 }
 function seqStart() {
+  if(seqCanvas)return;
   seqCanvas = document.createElement('canvas');
   seqCanvas.className = 'hw-seq';
   seqCanvas.setAttribute('aria-hidden', 'true');
   view.prepend(seqCanvas);
   seqCtx = seqCanvas.getContext('2d', { alpha: false });
+  if(!seqCtx){seqFail();return;}
   resize();
   new ResizeObserver(resize).observe(view);
-  seqRequest(reduced ? 0 : clamp((frameAt(scrollProgress()) - FIRST) / SEQ.step, 0, SEQ.n - 1));
+  const initialFrame=!reduced&&playback==='scroll'?frameAt(scrollProgress()):cur;
+  seqRequest(clamp((initialFrame-FIRST)/SEQ.step,0,SEQ.n-1));
   new IntersectionObserver(entries => {
     visible = entries[entries.length - 1].isIntersecting;
-    if (visible) { dirty = true; wake(); seqPump(); }
-    else if (mode === 'orbit') { exitOrbit(); tween = null; }
+    if (visible) {if(renderer&&!USE_SEQ&&!renderWidth)resize();dirty = true; wake(); seqPump();considerAuto3D(); }
+    else {benchmarkTicket++;benchmarking=false;if(mode==='orbit'){exitOrbit();tween=null;}releaseDrawBuffer();pacing.reset();suspendSequence();last=0;}
+    publish(true);
   }, { rootMargin: '120px 0px' }).observe(stage);
   addEventListener('scroll', () => {
     if (!visible) {
       const r = stage.getBoundingClientRect();
       if (r.bottom > -120 && r.top < innerHeight + 120) { visible = true; dirty = true; }
     }
-    wake();
+    if(!reduced&&playback==='scroll'){dirty=true;wake();}
   }, { passive: true });
-  // A click on the picture builds the live scene (labels, part names on hover,
-  // the 360 view); the click itself is answered as soon as it's ready.
-  view.addEventListener('pointerdown', e => {
-    if (e.button === 0 && !e.target.closest('a, button, .hw-label, .hw-orbit-ui')) startGL();
-  });
-  view.addEventListener('pointerup', e => {
-    if (stats.gl || e.button !== 0 || e.target.closest('a, button, .hw-label, .hw-orbit-ui')) return;
-    pendingClick = { x: e.clientX, y: e.clientY };
-    startGL();
-  });
-  orbitBtn.hidden = false;
+  orbitBtn.hidden=USE_SEQ;
 }
 orbitBtn.addEventListener('click', () => {
-  if (!stats.gl) { pendingOrbit = true; startGL(); return; }
+  if (!stats.gl||USE_SEQ) {setRendererMode('3d').then(()=>{if(!USE_SEQ)enterOrbit();});return;}
   mode === 'orbit' ? exitOrbit() : enterOrbit();
 });
 
 const texLoader = new THREE.TextureLoader();
 function loadTexture(url, { flipY = false, wrap = THREE.ClampToEdgeWrapping } = {}) {
+  const generation=resourceGeneration;
   return texLoader.loadAsync(url).then(t => {
+    if(generation!==resourceGeneration){t.dispose();throw new Error('Obsolete texture load');}ownedTextures.add(t);
     t.colorSpace = THREE.SRGBColorSpace;
     t.flipY = flipY;
     t.wrapS = t.wrapT = wrap;
@@ -724,13 +842,24 @@ const LIGHT_SCALE = window.__hwTune?.light ?? 0.8;
 const shadowSize = 2048;
 const yUp = ([x, y, z]) => new THREE.Vector3(x, z, -y);
 
-async function init() {
+async function init({probe=false}={}) {
   if (!window.WebGLRenderingContext) throw new Error('WebGL unavailable');
   try {
     // Keep fine wires, pin rows and engraved geometry clean on every display.
     // The existing pixel ceiling and offscreen release bound buffer memory.
     renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   } catch (e) { throw new Error('WebGL unavailable'); }
+  const owner=renderer;
+  // Context loss can happen during network loading or shader compilation,
+  // before the model supplies a camera. Observe it from the first allocation.
+  owner.domElement.addEventListener('webglcontextlost',event=>{
+    event.preventDefault();if(renderer!==owner)return;
+    contextLost=true;autoConsidered=true;guided('Switched to Guided because interactive 3D became unavailable.');
+  });
+  owner.domElement.addEventListener('webglcontextrestored',()=>{
+    if(renderer!==owner)return;
+    contextLost=false;owner.shadowMap.needsUpdate=true;releaseDrawBuffer();dirty=true;wake();publish(true);
+  });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   stats.shadow = shadowSize;
   // The film is graded with AgX at -0.12 EV.
@@ -746,6 +875,7 @@ async function init() {
   // Inspect the actual renderer, without allocating a second probe context.
   const gpuInfo = context.getExtension('WEBGL_debug_renderer_info');
   stats.gpu = String(context.getParameter(gpuInfo ? gpuInfo.UNMASKED_RENDERER_WEBGL : context.RENDERER));
+  if(probe&&/swiftshader|llvmpipe|software|microsoft basic/i.test(stats.gpu))throw new Error('Automatic 3D requires an accelerated renderer');
   renderer.setClearColor(0x060607, 1);
   renderer.domElement.setAttribute('aria-hidden', 'true');
 
@@ -780,18 +910,25 @@ async function init() {
   const loader = new GLTFLoader();
   loader.setDRACOLoader(draco);
   // Model, first screenshot and the marble artwork load together.
-  const [gltf, page0, marbleUV, marbleWin] = await Promise.all([
+  const assets = await Promise.allSettled([
     loader.loadAsync(MODEL, e => {
-      if (e.total) statusEl.textContent = `Loading the 3D model · ${Math.round((e.loaded / e.total) * 100)}%`;
+      if (e.total&&loading3D) modeReason = `Loading interactive 3D · ${Math.round((e.loaded / e.total) * 100)}%`;
     }),
     loadTexture(PAGES[0]),
     loadTexture(MARBLE),
     loadTexture(MARBLE, { flipY: true, wrap: THREE.MirroredRepeatWrapping }),
   ]);
   draco.dispose();
+  // Wait for every sibling request before disposing a failed load; otherwise
+  // a late texture completion can leak into the next renderer generation.
+  const failedAsset=assets.find(result=>result.status==='rejected');
+  if(failedAsset){const model=assets[0];if(model.status==='fulfilled')scene.add(model.value.scene);throw failedAsset.reason;}
+  const [gltf,page0,marbleUV,marbleWin]=assets.map(result=>result.value);
   pageTex[0] = page0;
 
   scene.add(gltf.scene);
+  if(renderer!==owner||contextLost||context.isContextLost())throw new Error('3D context was lost during loading');
+  if(probe&&requestedRenderer!=='3d'&&(manualInteracted||document.hidden||!visible))throw new Error('Automatic 3D check cancelled');
   camera = gltf.cameras[0];
   if (!camera) throw new Error('Model has no camera');
   camera.near = 0.004; camera.far = 20;
@@ -878,17 +1015,15 @@ async function init() {
   if (USE_SEQ) { liveShown = null; showLive(false); }
   resize();
   // Warm the GPU: compile shaders and upload geometry before the first scroll frame.
-  apply(FIRST);
+  apply(cur);
   if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
   else renderer.compile(scene, camera);
-  new ResizeObserver(resize).observe(view);
-
-  cur = tgt = frameAt(scrollProgress());
+  if(renderer!==owner||contextLost||context.isContextLost())throw new Error('3D context was lost during compilation');
+  if(BAKE)cur = tgt = frameAt(scrollProgress());
   apply(cur);
-  renderer.render(scene, camera);
-  stats.ready = true;
-  stage.classList.add('is-ready');
-  statusEl.hidden = true;
+  if(BAKE||((!USE_SEQ||benchmarking||loading3D)&&visible&&!document.hidden))renderer.render(scene, camera);
+  stats.ready = USE_SEQ?seqDrawn:true;
+  if(stats.ready){stage.classList.add('is-ready');statusEl.hidden = true;}
 
   // The other three screenshots arrive in the background, well before the
   // laptop shot; the screen holds the first page until they do.
@@ -898,38 +1033,14 @@ async function init() {
     shownPage = -1; dirty = true; wake();
   }).catch(() => {}));
 
-  // Use the latest entry: a fast jump can queue several in one callback.
-  new IntersectionObserver(entries => {
-    visible = entries[entries.length - 1].isIntersecting;
-    if (visible) {
-      if (!renderWidth && !document.hidden) resize();
-      dirty = true; wake();
-    } else {
-      if (mode === 'orbit') { exitOrbit(); tween = null; }
-      releaseDrawBuffer();
-    }
-  }, { rootMargin: '120px 0px' }).observe(stage);
-  // Backstop for a missed observer callback: on scroll, confirm visibility directly.
-  addEventListener('scroll', () => {
-    if (!visible) {
-      const r = stage.getBoundingClientRect();
-      if (r.bottom > -120 && r.top < innerHeight + 120) {
-        visible = true;
-        if (!renderWidth && !document.hidden) resize();
-        dirty = true;
-      }
-    }
-    wake();
-  }, { passive: true });
-
   // Pointer. In the film nothing but scroll moves the picture: a click
   // labels the part under it, hovering names it. The 360 view is the only
   // mode in which dragging moves the camera.
   const canvas = renderer.domElement;
-  canvas.addEventListener('webglcontextrestored', () => {
-    renderer.shadowMap.needsUpdate = true; dirty = true; wake();
-  });
   canvas.style.touchAction = 'pan-y';
+  canvas.tabIndex=-1;canvas.setAttribute('role','group');
+  const keyboardHint=stage.querySelector('.hw-orbit-hint');
+  if(keyboardHint){keyboardHint.id='hwModelKeyboardHelp';keyboardHint.textContent='Drag or use arrow keys to look around · + / − zoom · R resets · Escape returns · tap a part to label it';canvas.setAttribute('aria-describedby',keyboardHint.id);}
   // The mouse wheel always scrolls the page (trackpad pinch, sent as
   // ctrl+wheel, still zooms in the 360 view). Registered before the
   // controls so it runs first.
@@ -948,6 +1059,34 @@ async function init() {
   orbit.maxPolarAngle = Math.PI / 2 - 0.06;   // stay above the table
   canvas.style.touchAction = 'pan-y';         // OrbitControls sets 'none'; only the 360 view needs it
   orbit.addEventListener('change', wake);
+  const keyOffset=new THREE.Vector3(),keySphere=new THREE.Spherical();
+  canvas.addEventListener('keydown',event=>{
+    if(document.activeElement!==canvas||USE_SEQ||contextLost||!visible||event.altKey||event.ctrlKey||event.metaKey)return;
+    if(mode!=='orbit'){
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();enterOrbit();}
+      return;
+    }
+    if(event.key==='Escape'){event.preventDefault();exitOrbit();orbitBtn.focus({preventScroll:true});return;}
+    const key=event.key.toLowerCase();
+    if(!['arrowleft','arrowright','arrowup','arrowdown','+','=','-','_','r'].includes(key))return;
+    event.preventDefault();markManual();tween=null;
+    const damping=orbit.enableDamping;orbit.enableDamping=false;orbit.update();
+    if(key==='r'&&orbitHome){orbit.target.copy(orbitHome.target);orbitCam.position.copy(orbitHome.position);}
+    else{
+      keyOffset.subVectors(orbitCam.position,orbit.target);keySphere.setFromVector3(keyOffset);
+      if(key==='arrowleft')keySphere.theta-=.12;
+      if(key==='arrowright')keySphere.theta+=.12;
+      if(key==='arrowup')keySphere.phi-=.1;
+      if(key==='arrowdown')keySphere.phi+=.1;
+      if(key==='+'||key==='=')keySphere.radius*=.8;
+      if(key==='-'||key==='_')keySphere.radius*=1.25;
+      keySphere.phi=clamp(keySphere.phi,orbit.minPolarAngle,orbit.maxPolarAngle);
+      keySphere.radius=clamp(keySphere.radius,orbit.minDistance,orbit.maxDistance);
+      orbitCam.position.copy(orbit.target).add(keyOffset.setFromSpherical(keySphere));
+    }
+    orbitCam.lookAt(orbit.target);orbit.update();orbit.enableDamping=damping;
+    zoomGoal=orbitCam.position.distanceTo(orbit.target);dirty=true;wake();publish(true);
+  });
 
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), box = new THREE.Box3(), hit = new THREE.Vector3();
   const ndcAt = e => {
@@ -960,12 +1099,12 @@ async function init() {
 
   let press = null, tipTimer = 0;
   view.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || e.target.closest('.hw-label, .hw-orbit-ui')) return;
+    if (USE_SEQ||e.button !== 0 || e.target.closest('.hw-label, .hw-orbit-ui')) return;
     press = { x: e.clientX, y: e.clientY, t: e.timeStamp };
   });
   view.addEventListener('pointercancel', () => { press = null; });
   pickAt = (clientX, clientY) => {
-    if (USE_SEQ && mode === 'film' && !tween) apply(cur);   // pose the undrawn scene at this frame
+    if(USE_SEQ)return;
     ndcAt({ clientX, clientY });
     const cam = activeCam();
     ray.setFromCamera(ndc, cam);
@@ -992,7 +1131,7 @@ async function init() {
     pickAt(e.clientX, e.clientY);
   });
   view.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse' || e.buttons || tipTimer) return;
+    if (USE_SEQ||e.pointerType !== 'mouse' || e.buttons || tipTimer) return;
     tipTimer = requestAnimationFrame(() => {
       tipTimer = 0;
       const r = ndcAt(e);
@@ -1017,7 +1156,7 @@ async function init() {
   view.addEventListener('pointerleave', () => { tip.hidden = true; view.classList.remove('is-pointing'); });
 
   labelEl.querySelector('.hw-label-x').addEventListener('click', closeLabel);
-  orbitBtn.hidden = false;
+  orbitBtn.hidden = USE_SEQ;
   document.getElementById('hwExit360').addEventListener('click', exitOrbit);
   document.getElementById('hwZoomIn').addEventListener('click', () => { zoomGoal = clamp(zoomGoal * 0.8, orbit.minDistance, orbit.maxDistance); wake(); });
   document.getElementById('hwZoomOut').addEventListener('click', () => { zoomGoal = clamp(zoomGoal * 1.25, orbit.minDistance, orbit.maxDistance); wake(); });
@@ -1028,9 +1167,8 @@ async function init() {
   });
 
   stats.gl = true;
-  visible = true; wake();
-  if (pendingOrbit) { pendingOrbit = false; enterOrbit(); }
-  if (pendingClick) { const c = pendingClick; pendingClick = null; if (mode === 'film') pickAt(c.x, c.y); }
+  if(USE_SEQ&&!benchmarking&&!loading3D)releaseDrawBuffer();
+  wake();publish(true);
 }
 
 updateHud(FIRST);
@@ -1042,7 +1180,7 @@ const start = () => {
   if (started) return;
   started = true;
   near.disconnect();
-  if (USE_SEQ) seqStart(); else startGL();
+  if (USE_SEQ) seqStart(); else startGL().catch(()=>fail('The interactive model could not load. The still remains available.'));
 };
 const near = new IntersectionObserver(es => { if (es[es.length - 1].isIntersecting) start(); }, { rootMargin: '100% 0px' });
 near.observe(stage);
@@ -1058,11 +1196,13 @@ if (BAKE) {
 
 window.pathosPrototype = {
   stats, film,
-  get state() { const baked = USE_SEQ && mode === 'film' && !tween; return { frame: cur, target: tgt, chapter: activeChapter, visible, rendering: !!raf, page: baked ? pageAt(Math.round(cur)) : shownPage, art: baked ? artAt(Math.round(cur)) : uArt.value, mode, seq: USE_SEQ, tweening: !!tween, label: pinned ? LABELS[pinned.obj.name][0] : null }; },
+  get state() {return stateSnapshot();},
+  setRendererMode,play,pause,seek,selectChapter,
   frameAt, progressAt, scrollProgress, scrollYForFrame,
   get debug() { return { scene, camera, mixer, orbit, orbitCam, renderer }; },
-  enterOrbit: () => enterOrbit(), exitOrbit: () => exitOrbit(),
+  enterOrbit: async () => {if(USE_SEQ)await setRendererMode('3d');if(!USE_SEQ)enterOrbit();}, exitOrbit: () => exitOrbit(),
   // Tests: pose the live scene at the current frame (with the pre-rendered
   // film it is only posed when picked or labelled).
   sync: () => { if (mixer && mode === 'film' && !tween) apply(cur); },
 };
+publish(true);document.dispatchEvent(new CustomEvent('pathos:hardwareready',{detail:window.pathosPrototype}));

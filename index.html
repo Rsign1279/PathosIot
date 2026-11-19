@@ -343,15 +343,25 @@
 </div>
 </div>
 
-    <section id="prototype" class="prototype" aria-label="Pathos IoT hardware, in 3D">
-        <div class="wrap">
-            <header class="sec-head sys-head prototype-head" data-reveal>
+    <section id="prototype" class="prototype hw-experience" aria-label="Pathos IoT hardware, two ways to explore" data-hw-renderer="guided">
+  <div class="wrap hw-experience-shell">
+    <div class="hw-experience-copy">
+      <header class="sec-head sys-head prototype-head" data-reveal>
                 <p class="eyebrow">04 &middot; Hardware in 3D</p>
                 <h2 class="heading-2">Follow one signal through the&nbsp;rig</h2>
-                <p class="body-3 sec-tag">Scroll to take it apart.</p>
+                <p class="body-3 sec-tag">Play the guided visual, move the timeline, or explore the full 3D model.</p>
             </header>
-        </div>
-        <div class="hw-track" id="hwTrack">
+      <button type="button" class="hw-start" id="hwStart"><span id="hwStartText">Start walkthrough</span><span aria-hidden="true">→</span></button>
+      <p class="hw-experience-invite">Want a closer look? Switch to <button type="button" id="hwExplore3D">3D Walkthrough</button>.</p>
+      <p class="hw-mode-note" id="hwModeNote" role="status" aria-live="polite">Guided visual is ready to explore.</p>
+    </div>
+    <div class="hw-experience-main">
+      <div class="hw-mode-tabs" role="tablist" aria-label="Hardware viewing mode">
+        <button type="button" role="tab" id="hwGuidedTab" aria-selected="true" aria-controls="hwExperiencePanel" tabindex="0" data-hw-mode="guided">Guided Visual</button>
+        <button type="button" role="tab" id="hw3DTab" aria-selected="false" aria-controls="hwExperiencePanel" tabindex="-1" data-hw-mode="3d">3D Walkthrough</button>
+      </div>
+      <div class="hw-experience-panel" id="hwExperiencePanel" role="tabpanel" aria-labelledby="hwGuidedTab">
+        <div class="hw-track" id="hwTrack" data-hw-compact="true">
             <div class="hw-stage" id="hwStage">
                 <div class="hw-bar">
                     <span class="hw-file"><i class="dot" aria-hidden="true"></i>pathos-hardware.glb</span>
@@ -361,7 +371,7 @@
                 </div>
                 <div class="hw-view" id="hwView">
                     <img class="hw-poster" id="hwPoster" src="assets/pathos-hardware-poster.webp" alt="The Pathos IoT prototype on a matte black table: the breadboard rig with its power bank and finger electrodes beside a midnight MacBook showing the Pathos IoT Stress-Lysis Monitor." width="1600" height="900" decoding="async">
-                    <p class="hw-status" id="hwStatus" role="status">Loading the 3D model…</p>
+                    <p class="hw-status" id="hwStatus" role="status">Preparing the guided visual…</p>
                     <span class="hw-tip" id="hwTip" hidden></span>
                     <div class="hw-label" id="hwLabel" role="status" hidden>
                         <i class="hw-label-dot" aria-hidden="true"></i>
@@ -371,60 +381,71 @@
                         <span class="hw-orbit-hint">Drag to look around &middot; tap a part to label it</span>
                         <button type="button" class="hw-orbit-btn" id="hwZoomIn" aria-label="Zoom in">+</button>
                         <button type="button" class="hw-orbit-btn" id="hwZoomOut" aria-label="Zoom out">&minus;</button>
-                        <button type="button" class="hw-orbit-exit" id="hwExit360">Back to the film</button>
+                        <button type="button" class="hw-orbit-exit" id="hwExit360">Back to walkthrough</button>
                     </div>
-                    <div class="hw-hud" id="hwHud" aria-live="polite">
-                        <article class="hw-chapter" data-shot-start="1" data-shot-end="298" data-start="1" data-end="286" data-rail="Overview">
+
+                </div>
+
+                <div class="hw-scrub" aria-hidden="true"><span id="hwScrub"></span></div>
+            </div>
+        </div>
+        <div class="hw-player-controls">
+          <button type="button" class="hw-play" id="hwPlay" aria-label="Play walkthrough"><span id="hwPlayIcon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5 13 8l-9 5.5Z"/></svg></span><span id="hwPlayText">Play</span></button>
+          <label class="hw-sr" for="hwSeek">Walkthrough position</label>
+          <input type="range" class="hw-seek" id="hwSeek" min="0" max="1000" step="1" value="0" aria-valuetext="Start of the walkthrough">
+          <output class="hw-time" id="hwTime" for="hwSeek">0:00 / 0:48</output>
+        </div>
+        <div class="hw-hud" id="hwHud" aria-live="polite">
+                        <article class="hw-chapter" data-hw-current="true" data-shot-start="1" data-shot-end="298" data-start="1" data-end="286" data-rail="Overview">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;01</p>
                             <h3 class="hw-title hw-title--intro">Pathos IoT</h3>
                             <div class="hw-plate hw-plate--short"><p class="hw-caption">PHYSIOLOGICAL AWARENESS, ENGINEERED.</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="298" data-shot-end="688" data-start="298" data-end="676" data-rail="Exploded view">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="298" data-shot-end="688" data-start="298" data-end="676" data-rail="Exploded view">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;02</p>
                             <div class="hw-plate"><p class="hw-caption">ONE BREADBOARD. EIGHT CONNECTED MODULES.</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="688" data-shot-end="898" data-start="688" data-end="886" data-rail="The brain">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="688" data-shot-end="898" data-start="688" data-end="886" data-rail="The brain">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;03</p>
                             <h3 class="hw-title">The brain</h3>
                             <div class="hw-plate"><p class="hw-caption">ESP32-S3 / ACQUISITION, CONTROL AND WI-FI</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="898" data-shot-end="1198" data-start="898" data-end="1194" data-rail="Sensor highway">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="898" data-shot-end="1198" data-start="898" data-end="1194" data-rail="Sensor highway">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;04</p>
                             <div class="hw-plate"><p class="hw-caption">TMP117 / ADS1115 / MPU6050 / MAX30102 / BME280</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="1198" data-shot-end="1498" data-start="1198" data-end="1486" data-rail="GSR data path">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="1198" data-shot-end="1498" data-start="1198" data-end="1486" data-rail="GSR data path">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;05</p>
                             <div class="hw-plate"><p class="hw-caption">ELECTRODES&nbsp;&nbsp;&gt;&nbsp;&nbsp;GSR&nbsp;&nbsp;&gt;&nbsp;&nbsp;ADS1115 A0&nbsp;&nbsp;&gt;&nbsp;&nbsp;I2C&nbsp;&nbsp;&gt;&nbsp;&nbsp;ESP32-S3</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="1498" data-shot-end="1678" data-start="1498" data-end="1666" data-rail="Storage">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="1498" data-shot-end="1678" data-start="1498" data-end="1666" data-rail="Storage">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;06</p>
                             <div class="hw-plate"><p class="hw-caption">ESP32-S3&nbsp;&nbsp;&gt;&nbsp;&nbsp;DEDICATED SPI&nbsp;&nbsp;&gt;&nbsp;&nbsp;microSD</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="1678" data-shot-end="1948" data-start="1678" data-end="1936" data-rail="Wi-Fi">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="1678" data-shot-end="1948" data-start="1678" data-end="1936" data-rail="Wi-Fi">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;07</p>
                             <h3 class="hw-title">Connected, wirelessly</h3>
                             <div class="hw-plate"><p class="hw-caption">ESP32-S3&nbsp;&nbsp;&gt;&nbsp;&nbsp;WI-FI&nbsp;&nbsp;&gt;&nbsp;&nbsp;LAPTOP</p></div>
                         </article>
-                        <article class="hw-chapter" data-shot-start="1948" data-shot-end="2248" data-start="0" data-end="0" data-rail="Laptop">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="1948" data-shot-end="2248" data-start="0" data-end="0" data-rail="Laptop">
                             <p class="hw-sr">The laptop shows the Pathos IoT v1 software: Live Instrument, Model Study, Source Data and Diagnostics.</p>
                         </article>
-                        <article class="hw-chapter" data-shot-start="2248" data-shot-end="2518" data-start="2248" data-end="2506" data-rail="Full pipeline">
+                        <article class="hw-chapter" data-hw-current="false" data-shot-start="2248" data-shot-end="2518" data-start="2248" data-end="2506" data-rail="Full pipeline">
                             <p class="hw-eyebrow">Pathos IoT&nbsp;&nbsp;/&nbsp;&nbsp;09</p>
                             <h3 class="hw-title">The complete pipeline</h3>
                             <div class="hw-plate"><p class="hw-caption">SENSORS &gt; ESP32-S3 &gt; WI-FI &gt; PROCESSING &gt; V4 &gt; DASHBOARD</p></div>
                         </article>
-                        <article class="hw-chapter hw-chapter--final" data-shot-start="2518" data-shot-end="2881" data-start="2598" data-end="2881" data-rail="Reassembly">
+                        <article class="hw-chapter hw-chapter--final" data-hw-current="false" data-shot-start="2518" data-shot-end="2881" data-start="2598" data-end="2881" data-rail="Reassembly">
                             <h3 class="hw-title hw-title--final">Pathos IoT</h3>
                             <div class="hw-plate hw-plate--final"><p class="hw-line hw-line--ink">Stress You Can&rsquo;t See,</p><p class="hw-line hw-line--gold">Awareness You Can.</p></div>
                             <a class="hw-cta" href="#product">See the real build &darr;</a>
                         </article>
                     </div>
-                </div>
-                <nav class="hw-rail" id="hwRail" aria-label="Chapters"></nav>
-                <div class="hw-scrub" aria-hidden="true"><span id="hwScrub"></span></div>
-            </div>
-        </div>
-    </section>
+      </div>
+      <nav class="hw-rail" id="hwRail" aria-label="Walkthrough chapters"></nav>
+    </div>
+  </div>
+</section>
 
     <!-- 4. Feature: 05 The build: MVP 1 and the field, as a scroll-driven photo deck -->
     <section id="product" class="field" aria-label="The build: MVP 1, in photos">
@@ -759,6 +780,7 @@
     <script type="module" src="film.js"></script>
     <script type="module" src="hero.js"></script>
     <script type="module" src="prototype-loader.js"></script>
+    <script type="module" src="hardware-experience.js"></script>
     <script type="module" src="integration.js"></script>
     <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>
 </body>

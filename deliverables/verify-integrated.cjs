@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {gzipSync} = require('node:zlib');
+const {prepareStylesheet}=require('./design-system.cjs');
 const root = path.resolve(__dirname, '..');
 const read = name => fs.readFileSync(path.join(root,name),'utf8');
 const original = read('deliverables/original-page.html');
@@ -50,6 +51,15 @@ function textContent(html,id){
 }
 for(const id of expectedIds){
   if(!before[id]||!after[id])continue;
+  if(id==='prototype'){
+    // The approved two-mode player changes the shell and controls. Every
+    // original chapter, technical caption and media reference stays intact.
+    const chapters=html=>blocks(html,'article').filter(block=>hasClass(block.open,'hw-chapter')).map(block=>normalizeMarkup(block.inner,id));
+    check(JSON.stringify(chapters(before[id].inner))===JSON.stringify(chapters(after[id].inner)),'Hardware: all ten original chapter bodies remain in order');
+    for(const match of before[id].inner.matchAll(/\bid=["']([^"']+)["']/g))check(after[id].inner.includes(`id="${match[1]}"`),`Hardware: original control ${match[1]} remains available`);
+    check(/data-hw-compact="true"/.test(after[id].inner)&&/role="tablist"/.test(after[id].inner),'Hardware: compact accessible mode controls are present');
+    continue;
+  }
   const oldMarkup=normalizeMarkup(before[id].inner,id),newMarkup=normalizeMarkup(after[id].inner,id);
   check(oldMarkup===newMarkup,`${id}: original DOM/content changed beyond the permitted hero, loading, form, or decorative-art edits`);
   check(textContent(before[id].inner,id)===textContent(after[id].inner,id),`${id}: original text changed or was removed`);
@@ -92,13 +102,14 @@ for(const id of ['hero','proof','film','device-tour','prototype','product','cont
 const sheets=[...current.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/g)].map(m=>attr(m[0],'href'));
 check(JSON.stringify(sheets)===JSON.stringify(['integrated.css']),'The integrated page must request one CSS bundle');
 const moduleSources=[...current.matchAll(/<script\b[^>]*src=["']([^"']+)["'][^>]*>/g)].map(m=>m[1]);
-const needed=['main.js','tilt.js','field.js','play.js','story.js','film.js','hero.js','prototype-loader.js','integration.js'];
+const needed=['main.js','tilt.js','field.js','play.js','story.js','film.js','hero.js','prototype-loader.js','hardware-experience.js','integration.js'];
 check(JSON.stringify(moduleSources)===JSON.stringify(needed),'Original functional modules plus the scoped integration and lazy hardware loader must remain');
-check(!/\bexperience\.(?:js|css)\b/.test(current),'Replacement-page experience modules must not load');
+check(!/(?:src|href)=["'](?:\.\/)?experience\.(?:js|css)["']/.test(current),'Replacement-page experience modules must not load');
 const css=read('integrated.css');
 check(!/fonts\.(?:googleapis|gstatic)\.com/.test(current+css),'Integrated page must serve fonts locally');
-check(css.includes(read('integration.css')),'The served CSS bundle must include the current integration stylesheet');
-check(css.includes(read('brand.css')),'The served CSS bundle must include the current brand stylesheet');
+for(const file of ['integration.css','brand.css','design-tokens.css','ui-system.css','hardware-experience.css','compact-layout.css','media-controls.css'])check(css.includes(prepareStylesheet(read(file))),`The served bundle includes the current root-relative ${file}`);
+check(!/(?:^|[;{])\s*font-size\s*:[^;}]*\dpx\b/m.test(css),'Compiled text sizes must respect root text settings');
+check(!/(?:^|[;{])\s*line-height\s*:[^;}]*\dpx\b/m.test(css),'Compiled text leading must grow with enlarged type');
 const changedScripts=['main.js','story.js','play.js','integration.js','orbit-motion.js','prototype-loader.js','planet.js','prototype.js','hardware-quality.js','hero.js','film.js','deliverables/build-integrated.cjs'];
 for(const script of changedScripts){const result=spawnSync(process.execPath,['--check',path.join(root,script)],{encoding:'utf8'});check(result.status===0,`${script}: JavaScript syntax error ${result.stderr}`);}
 

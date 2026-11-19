@@ -1,5 +1,5 @@
-/* The original marble film, deferred until the first paint and played only
-   while visible. A matching poster is the reduced-motion and loading state. */
+/* The original marble film, deferred until the first paint. The visitor's
+   playback choice survives automatic visibility pauses and source changes. */
 const hero = document.getElementById('hero');
 const video = document.getElementById('heroVideo');
 
@@ -10,44 +10,35 @@ if (hero && video) {
   const posters = { land: 'assets/hero/hero-poster.webp', port: 'assets/hero/hero-poster-portrait.webp' };
   let kind = '', loadedKind = '', painted = false, onScreen = false;
   let pending = false, blocked = false, attempt = 0, retryTimer = 0, retries = 0;
-  let retryButton;
+  let userPaused = false, motionOverride = false;
 
   video.muted = true;
   video.loop = true;
   video.playsInline = true;
   video.preload = 'none';
 
-  const eligible = () => painted && onScreen && !document.hidden && !reduced.matches;
+  const control = document.createElement('button');
+  control.type = 'button';
+  control.className = 'hero-film-control';
+  control.setAttribute('aria-controls', video.id);
+  (hero.querySelector('.hero-inner') || hero).append(control);
+
+  const eligible = () => painted && onScreen && !document.hidden && !userPaused && (!reduced.matches || motionOverride);
+  const syncControl = () => {
+    control.textContent = !blocked && (!video.paused || pending) ? 'Pause background film' : 'Play background film';
+  };
   const clearRetry = () => { clearTimeout(retryTimer); retryTimer = 0; };
   const pause = () => {
     clearRetry();
     attempt++;
     pending = false;
     video.pause();
+    syncControl();
   };
   const showRetry = () => {
     blocked = true;
-    clearRetry();
     video.style.visibility = 'hidden';
-    if (!retryButton) {
-      retryButton = document.createElement('button');
-      retryButton.type = 'button';
-      retryButton.className = 'hero-film-retry';
-      retryButton.textContent = 'Play background film';
-      retryButton.setAttribute('aria-controls', video.id);
-      retryButton.style.cssText = 'position:absolute;z-index:3;right:24px;top:96px;padding:8px 12px;border:1px solid #d2af70;border-radius:8px;background:#131209;color:#f3e9e1;font-size:14px;min-height:44px;';
-      retryButton.addEventListener('click', () => {
-        blocked = false;
-        retries = 0;
-        if (video.error) loadedKind = '';
-        retryButton.hidden = true;
-        video.style.visibility = '';
-        tryPlay();
-      });
-      hero.append(retryButton);
-    }
     pause();
-    retryButton.hidden = !eligible();
   };
   const scheduleRetry = () => {
     if (!eligible() || blocked || retryTimer || retries >= 3) return;
@@ -65,26 +56,29 @@ if (hero && video) {
       loadedKind = kind;
       video.src = sources[kind];
       video.load();
-    }
+    } else if (!video.paused) return;
     const currentAttempt = ++attempt;
     pending = true;
+    syncControl();
     Promise.resolve(video.play()).then(() => {
       if (currentAttempt !== attempt) return;
       pending = false;
       if (!eligible()) pause();
+      else syncControl();
     }).catch(error => {
       if (currentAttempt !== attempt) return;
       pending = false;
+      syncControl();
       if (!eligible()) return;
       if (error.name === 'AbortError') scheduleRetry();
       else showRetry();
     });
   };
   const update = () => {
-    video.style.visibility = reduced.matches || blocked ? 'hidden' : '';
-    if (retryButton) retryButton.hidden = !blocked || !eligible();
+    video.style.visibility = (reduced.matches && !motionOverride) || blocked ? 'hidden' : '';
     if (eligible()) tryPlay();
     else pause();
+    syncControl();
   };
   const pick = () => {
     const next = tall.matches ? 'port' : 'land';
@@ -96,9 +90,23 @@ if (hero && video) {
     update();
   };
 
+  control.addEventListener('click', () => {
+    if (!blocked && (!video.paused || pending)) {
+      userPaused = true;
+      pause();
+    } else {
+      userPaused = false;
+      motionOverride = true;
+      blocked = false;
+      retries = 0;
+      if (video.error) loadedKind = '';
+      update();
+    }
+  });
+  const motionChanged = () => { motionOverride = false; update(); };
   pick();
   tall.addEventListener ? tall.addEventListener('change', pick) : tall.addListener(pick);
-  reduced.addEventListener ? reduced.addEventListener('change', update) : reduced.addListener(update);
+  reduced.addEventListener ? reduced.addEventListener('change', motionChanged) : reduced.addListener(motionChanged);
   new IntersectionObserver(entries => {
     onScreen = entries[entries.length - 1].isIntersecting;
     update();
@@ -109,11 +117,13 @@ if (hero && video) {
     retries = 0;
     clearRetry();
     if (eligible()) video.style.visibility = '';
+    else pause();
+    syncControl();
   });
   video.addEventListener('timeupdate', () => { retries = 0; clearRetry(); });
   video.addEventListener('waiting', scheduleRetry);
   video.addEventListener('stalled', scheduleRetry);
-  video.addEventListener('pause', scheduleRetry);
+  video.addEventListener('pause', () => { syncControl(); scheduleRetry(); });
   video.addEventListener('error', () => { if (eligible()) showRetry(); });
 
   // Nested frames let the still, heading and primary action paint first.

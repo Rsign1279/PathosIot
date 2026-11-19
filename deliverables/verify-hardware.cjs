@@ -22,14 +22,14 @@ test(portrait.width*portrait.height<=ctx.budget,'Tall phone Full HD film remains
 const source=read('prototype.js');
 test(source.includes("const MODEL = './assets/pathos-hardware.glb'"),'Every device receives original geometry');
 test(source.includes("const MARBLE = './assets/marble.webp'")&&source.includes("const SHOT = ''"),'Every device receives original texture sources');
-test(source.includes('window.__hwSequence === true'),'Compressed sequence is opt-in only');
+test(source.includes('let USE_SEQ = !BAKE'),'Bounded guided sequence is the default outside the offline baker');
 test(!source.includes('cap * quality')&&!/quality\s*(?:-=|\*=|=\s*Math\.max)/.test(source),'Slow frames cannot progressively lower resolution');
 test(source.includes('renderer.shadowMap.autoUpdate = false')&&source.includes('renderer.shadowMap.needsUpdate = true'),'Full-resolution shadows are cached and pose changes invalidate them');
 test(source.includes('if (frame !== appliedFrame)'),'Unchanged poses avoid animation evaluation');
 test(source.includes('room.dispose()')&&source.includes('pmrem.dispose()')&&source.includes('draco.setWorkerLimit(2)'),'Environment scratch resources and decode concurrency are bounded');
 test(source.includes('await renderer.compileAsync(scene, camera)'),'Shader compilation can run asynchronously');
 test(source.includes('if (!visible || document.hidden) return;'),'Offscreen or background hardware cannot keep rendering');
-test(source.includes('renderer.setSize(1, 1, false)')&&source.includes('if (!renderWidth && !document.hidden) resize()'),'Invisible study releases large draw buffers and restores them before display');
+test(source.includes('renderer.setSize(1, 1, false)')&&source.includes('if(renderer&&!USE_SEQ&&!renderWidth)resize()'),'Invisible study releases large draw buffers and restores them before live display');
 test(read('prototype-loader.js').includes("rootMargin:'100% 0px'"),'Model preparation begins one viewport ahead');
 test(source.includes("PATHOS dashboard • inset rounded window")&&source.includes('PATHOS_ROOT__static'),'Original model lookup names survive');
 test(source.includes('maxRenderDimension, film.w, film.h'),'Allocation uses actual Blender picture dimensions rather than the whole viewport');

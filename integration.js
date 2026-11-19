@@ -173,7 +173,14 @@ function tick(time){
 }
 function updateMotion(){
   document.documentElement.classList.toggle('planet-paused',paused);
-  if(control){control.setAttribute('aria-pressed',String(paused));control.setAttribute('aria-label',paused?'Resume planet and text motion':'Pause planet and text motion');control.querySelector('span:first-child').textContent=paused?'▷':'Ⅱ';control.querySelector('.planet-motion-label').textContent=paused?'Resume story':'Pause story';}
+  if(control){
+    control.setAttribute('aria-pressed',String(paused));
+    control.setAttribute('aria-label',paused?'Resume planet and text motion':'Pause planet and text motion');
+    const icon=control.querySelector('span:first-child');
+    if(icon)icon.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(paused?'<path d="m9 5 11 7-11 7Z"/>':'<path d="M9 5v14M15 5v14"/>')+'</svg>';
+    const label=control.querySelector('.planet-motion-label');
+    if(label)label.textContent=paused?'Resume story':'Pause story';
+  }
   // A pause exposes every word; it never strands half-revealed copy.
   if(paused)for(const group of groups)for(const unit of group.units)setPose(unit,1,emergePose(1,0,0,mobile));
   scroll=scrollY;dirty=true;wake();
@@ -213,7 +220,22 @@ const mobileMenu=matchMedia('(max-width:900px)');
 if(nav){
   const syncMenu=()=>{const open=mobileMenu.matches&&nav.classList.contains('open');if(main)main.inert=open;if(footer)footer.inert=open;document.body.style.overflow=open?'hidden':'';};
   new MutationObserver(syncMenu).observe(nav,{attributes:true,attributeFilter:['class']});mobileMenu.addEventListener('change',syncMenu);
-  nav.querySelector('#navLinks')?.addEventListener('click',event=>{const link=event.target.closest('a[href^="#"]');if(link&&mobileMenu.matches){const destination=document.querySelector(link.getAttribute('href'));queueMicrotask(()=>{if(destination){destination.tabIndex=-1;destination.focus({preventScroll:true});}});}});
+  nav.querySelector('#navLinks')?.addEventListener('click',event=>{
+    const link=event.target.closest('a[href^="#"]');
+    // Pointer navigation should scroll without outlining an entire section.
+    // Keyboard activation transfers focus to its heading, so the next Tab
+    // continues inside the destination after the mobile menu closes.
+    if(!link||!mobileMenu.matches||event.detail!==0)return;
+    const destination=document.querySelector(link.getAttribute('href'));
+    const heading=destination?.querySelector('h1,h2,h3');
+    if(!heading)return;
+    queueMicrotask(()=>{
+      const temporary=!heading.hasAttribute('tabindex');
+      if(temporary)heading.tabIndex=-1;
+      heading.focus({preventScroll:true});
+      if(temporary)heading.addEventListener('blur',()=>heading.removeAttribute('tabindex'),{once:true});
+    });
+  });
   nav.addEventListener('keydown',event=>{if(event.key!=='Tab'||!mobileMenu.matches||!nav.classList.contains('open'))return;const focusable=[...nav.querySelectorAll('a[href],button:not([disabled])')].filter(el=>el.getClientRects().length);const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}});
   syncMenu();
 }

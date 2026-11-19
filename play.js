@@ -16,9 +16,8 @@
    Canvases only draw while visible; animations run on every device.
    ========================================================================== */
 
-// Animations run on every device, including when the system asks for reduced
-// motion (school laptops often ship with animations off). Founder's decision.
-const reduced = false;
+// Keep every explanation available without automatic motion.
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const ease = x => 1 - Math.pow(1 - x, 3);
 

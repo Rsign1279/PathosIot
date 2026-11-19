@@ -2,7 +2,7 @@
 // Optional asset build. Checked-in assets need no dependencies at runtime.
 // Install @resvg/resvg-js in ../brand-tools (outside this buildless site), or
 // provide it on NODE_PATH, then run node deliverables/build-brand.cjs.
-const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
+const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),cp=require('node:child_process');
 let Resvg;try{({Resvg}=require('@resvg/resvg-js'));}catch{({Resvg}=require(path.resolve(__dirname,'../../brand-tools/node_modules/@resvg/resvg-js')));}
 const art=require('./brand-art.cjs'),root=path.resolve(__dirname,'..'),out=path.join(root,'assets/brand');
 fs.mkdirSync(out,{recursive:true});
@@ -48,8 +48,9 @@ function crc(buffer){if(!crcTable)crcTable=Uint32Array.from({length:256},(_,n)=>
 function chunk(type,data){const tag=Buffer.from(type),body=Buffer.concat([tag,data]),length=Buffer.alloc(4),sum=Buffer.alloc(4);length.writeUInt32BE(data.length);sum.writeUInt32BE(crc(body));return Buffer.concat([length,body,sum]);}
 function png(width,height,rgba){const header=Buffer.alloc(13);header.writeUInt32BE(width,0);header.writeUInt32BE(height,4);header[8]=8;header[9]=6;const raw=Buffer.alloc((width*4+1)*height);for(let y=0;y<height;y++)rgba.copy(raw,y*(width*4+1)+1,y*width*4,(y+1)*width*4);return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',zlib.deflateSync(raw,{level:9})),chunk('IEND',Buffer.alloc(0))]);}
 write('pathos-iot-engraving.png',png(size,size,normal));
-const social=art.svg('0 0 1200 630',`<rect width="1200" height="630" fill="#10100e"/><ellipse cx="300" cy="315" rx="245" ry="235" fill="none" stroke="#8e792e" opacity=".16"/><g transform="translate(42 55) scale(2)">${art.mark()+art.wordmark()}</g><g fill="#f2ede4" font-family="Georgia,serif" font-size="61"><text x="568" y="229">Stress awareness.</text><text x="568" y="304">From the body's</text><text x="568" y="379">own signals.</text></g><path d="M570 439H1086" stroke="#c5ad7e" opacity=".35"/><text x="570" y="480" fill="${art.gold}" font-family="Arial,sans-serif" font-size="14" letter-spacing="3">PATHOS IoT · RESEARCH PROTOTYPE</text>`);
+const socialType=cp.execFileSync(process.env.PATHOS_PYTHON||'python',['deliverables/social-type.py'],{cwd:root,encoding:'utf8'});
+const social=art.svg('0 0 1200 630',`<metadata>Typography: Fraunces and Space Grotesk, outlined from the site's licensed local fonts.</metadata><rect width="1200" height="630" fill="#10100e"/><ellipse cx="300" cy="315" rx="245" ry="235" fill="none" stroke="#8e792e" opacity=".16"/><g transform="translate(42 55) scale(2)">${art.mark()+art.wordmark()}</g><path d="M570 439H1086" stroke="#c5ad7e" opacity=".35"/>${socialType}`);
 write('pathos-iot-social.svg',social);
-write('pathos-iot-social.png',new Resvg(social,{fitTo:{mode:'width',value:1200},font:{loadSystemFonts:true,serifFamily:'Georgia',sansSerifFamily:'Arial'}}).render().asPng());
+write('pathos-iot-social.png',new Resvg(social,{fitTo:{mode:'width',value:1200},font:{loadSystemFonts:false}}).render().asPng());
 console.log('Built faithful Pathos IoT vectors, favicon set, share card, and 512px packed engraving relief.');
 console.log('Engraving map: '+fs.statSync(path.join(out,'pathos-iot-engraving.png')).size+' bytes.');

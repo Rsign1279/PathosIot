@@ -1,71 +1,135 @@
-// Optional real-browser regression. Requires Playwright in the development environment.
+// Browser regression for the actual compact Guided/3D study. Serve on :3000.
+// HW_QA_3D=1 adds a manual Full HD model/context-loss check (may be slow on software GL).
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
-const path=require('node:path');
-const fs=require('node:fs'),os=require('node:os');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const out=process.env.PATHOS_QA_OUTPUT||path.join(os.tmpdir(),'pathos-hardware-qa');
+const base=process.env.PATHOS_QA_URL||'http://127.0.0.1:3000/';
 fs.mkdirSync(out,{recursive:true});
 (async()=>{
- const browser=await chromium.launch({headless:true,args:process.platform==='win32'?['--use-angle=d3d11','--enable-webgl','--enable-precise-memory-info']:['--enable-precise-memory-info']});
- try {
-  for(const device of [{name:'desktop',width:1440,height:1000,dpr:1},{name:'desktop-retina',width:1440,height:1000,dpr:2},{name:'mobile',width:390,height:844,dpr:3}].filter(d=>!process.env.HW_QA_DEVICE||d.name===process.env.HW_QA_DEVICE)){
-   const context=await browser.newContext({viewport:{width:device.width,height:device.height},deviceScaleFactor:device.dpr,isMobile:device.name==='mobile',hasTouch:device.name==='mobile'});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.PATHOS_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),args:['--enable-unsafe-swiftshader']});
+ try{
+  const cases=[{name:'desktop',width:1440,height:1000,dpr:1},{name:'mobile',width:375,height:812,dpr:3},{name:'tablet-no-gl',width:768,height:1024,dpr:2,noGL:true},{name:'landscape-reduced',width:844,height:390,dpr:2,reduced:true},{name:'missing-frames',width:390,height:844,dpr:1,missing:true},{name:'loading-timeout',width:1440,height:1000,dpr:1,timeout:true},{name:'loading-resize',width:375,height:900,dpr:1,resize:true},{name:'loading-context',width:375,height:900,dpr:1,contextLoss:true}].filter(d=>!process.env.HW_QA_DEVICE||d.name===process.env.HW_QA_DEVICE);
+  for(const device of cases){
+   const context=await browser.newContext({viewport:{width:device.width,height:device.height},deviceScaleFactor:device.dpr,reducedMotion:device.reduced?'reduce':'no-preference',isMobile:device.width<500,hasTouch:device.width<500});
+   // Exercise Guided without allowing an automatic hardware probe to alter the
+   // fixture; the policy suite independently tests automatic eligibility.
+   await context.addInitScript(({noGL,timeout})=>{
+    Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});
+    if(noGL){const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return /webgl/.test(type)?null:get.call(this,type,...args);};}
+    if(timeout){const timer=window.setTimeout;window.setTimeout=(callback,delay,...args)=>timer(callback,delay===45000?25:delay,...args);}
+   },{noGL:!!device.noGL,timeout:!!device.timeout});
    const page=await context.newPage(),errors=[],requests=[];
-   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
-   const start=Date.now();
-   await page.goto((process.env.PATHOS_QA_URL||'http://localhost:3000/?hardware=native-review#prototype'),{waitUntil:'load'});
-   await page.evaluate(()=>document.fonts.ready);
-   await page.waitForFunction(()=>window.pathosPrototype?.stats.gl&&window.pathosPrototype?.stats.ready,undefined,{timeout:90000});
-   const readyMs=Date.now()-start;
-   // Begin with real scroll input, as a visitor would. It cancels the page's
-   // initial deep-link correction before scripted chapter-seeking assertions.
-   await page.mouse.wheel(0,1);
-   await page.waitForTimeout(100);
-   for(const frame of device.name==='desktop'?[150,460,780,1080,1360,1590,1820,2060,2350,2720]:[460,1360,2350]){
-    await page.evaluate(f=>scrollTo({top:pathosPrototype.scrollYForFrame(f),behavior:'instant'}),frame);
-    await page.waitForFunction(f=>Math.abs(pathosPrototype.state.target-f)<2&&Math.abs(pathosPrototype.state.frame-pathosPrototype.state.target)<.1&&!pathosPrototype.state.rendering,frame,{timeout:12000}).catch(async e=>{console.log('FAILED SHOT',device.name,frame,await page.evaluate(()=>({state:pathosPrototype.state,stats:pathosPrototype.stats,scroll:scrollY,viewport:[innerWidth,innerHeight],rect:document.getElementById('hwTrack').getBoundingClientRect().toJSON()})));await page.screenshot({path:path.join(out,'hardware-qa-failure.png')});throw e;});
+   page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>requests.push(request.url()));
+   if(device.missing)await page.route('**/assets/hw-seq/*.webp',route=>route.abort());
+   if(device.timeout)await page.route('**/assets/pathos-hardware.glb',()=>{});
+   let heldModel;
+   if(device.resize||device.contextLoss)await page.route('**/assets/pathos-hardware.glb',route=>{heldModel=route;});
+   await page.goto(new URL('#prototype',base).href,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
+   await page.waitForFunction(()=>window.pathosPrototype);
+   await page.locator('#hwStage').scrollIntoViewIfNeeded();
+   if(device.missing){
+    await page.waitForFunction(()=>pathosPrototype.state.modeReason.includes('could not load'));
+    assert.equal(await page.evaluate(()=>pathosPrototype.state.ready),false);
+    assert.equal(await page.locator('#hwPoster').evaluate(el=>getComputedStyle(el).opacity),'1');
+   }else{
+    await page.waitForFunction(()=>pathosPrototype.state.ready);
+    assert.equal(await page.locator('#hwGuidedTab').getAttribute('aria-selected'),'true');
+    assert(!requests.some(url=>url.includes('/pathos-hardware.glb')),'Guided must not fetch the 3D model');
+    assert.equal(await page.locator('#hw360').isVisible(),false);
+    for(const index of [0,4,7,9]){
+     await page.locator('#hwRail button').nth(index).click();
+     await page.waitForFunction(i=>pathosPrototype.state.chapter===i,index);
+     assert.equal(await page.locator('.hw-chapter[data-hw-current="true"]').count(),1);
+    }
+    await page.locator('#hwSeek').evaluate(el=>{el.value='250';el.dispatchEvent(new Event('input',{bubbles:true}));});
+    await page.waitForFunction(()=>Math.abs(pathosPrototype.state.progress-.25)<.002);
+    await page.locator('#hwPlay').click();const before=await page.evaluate(()=>pathosPrototype.state.frame);
+    await page.waitForFunction(frame=>pathosPrototype.state.frame>frame+5,before);
+    await page.locator('#hwPlay').click();const paused=await page.evaluate(()=>pathosPrototype.state.frame);
+    await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),paused);
+    const cache=await page.evaluate(()=>pathosPrototype.stats.seqCached);
+    assert(cache<=(device.width<=640?6:10),'Decoded sequence cache remains bounded');
+    await page.locator('#hwStage').screenshot({path:path.join(out,`hardware-${device.name}.png`)});
+    if(device.resize){
+     await page.evaluate(()=>{window.__pending3D=pathosPrototype.setRendererMode('3d');});
+     await page.waitForFunction(()=>!!pathosPrototype.debug.renderer&&!pathosPrototype.debug.camera);
+     await page.setViewportSize({width:430,height:900});await page.waitForTimeout(200);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.rendererMode),'guided');
+     assert.deepEqual(errors,[],'Resizing while the model camera is unavailable must not throw');
+     await page.evaluate(()=>pathosPrototype.setRendererMode('guided'));
+     assert(heldModel,'The fixture must keep the GLB pending during resize');await heldModel.abort();
+     await page.evaluate(()=>window.__pending3D);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.rendererMode),'guided');
+    }
+    if(device.contextLoss){
+     await page.evaluate(()=>{window.__pending3D=pathosPrototype.setRendererMode('3d');});
+     await page.waitForFunction(()=>!!pathosPrototype.debug.renderer&&!pathosPrototype.debug.camera);
+     await page.evaluate(()=>pathosPrototype.debug.renderer.getContext().getExtension('WEBGL_lose_context').loseContext());
+     await page.waitForFunction(()=>!pathosPrototype.state.loading3D&&pathosPrototype.state.modeReason.includes('became unavailable'));
+     assert.equal(await page.locator('#hwGuidedTab').getAttribute('aria-selected'),'true');
+     assert(heldModel,'The GLB must still be pending when the context is lost');await heldModel.continue();
+     await page.evaluate(()=>window.__pending3D);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.rendererMode),'guided');
+     assert.equal(await page.evaluate(()=>!!pathosPrototype.stats.gl),false,'A model finishing after context loss cannot mark live 3D ready');
+    }
+    if(device.noGL||device.timeout){
+     await page.locator('#hw3DTab').click();await page.waitForFunction(()=>!pathosPrototype.state.loading3D);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.rendererMode),'guided');
+     assert.equal(await page.locator('#hwGuidedTab').getAttribute('aria-selected'),'true');
+     assert(await page.evaluate(()=>pathosPrototype.state.modeReason.includes('unavailable')));
+     if(device.noGL){
+      await page.evaluate(async()=>{const old=pathosPrototype.setRendererMode('3d');await pathosPrototype.setRendererMode('guided');await old;});
+      assert.equal(await page.evaluate(()=>pathosPrototype.state.modeReason),'Guided playback is ready.','A stale 3D failure must not override the latest manual choice');
+     }
+    }
+    if(process.env.HW_QA_3D==='1'&&device.name==='desktop'){
+     await page.emulateMedia({reducedMotion:'reduce'});
+     const preserved=await page.evaluate(()=>pathosPrototype.state.frame);
+     await page.locator('#hw3DTab').click();await page.waitForFunction(()=>pathosPrototype.state.rendererMode==='3d',undefined,{timeout:90000});
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),preserved);
+     const native=await page.evaluate(()=>({stats:pathosPrototype.stats,state:pathosPrototype.state}));
+     assert.deepEqual(Array.from(native.stats.picturePixels),[1920,1080]);assert(native.stats.bufferPixels<=8*1024*1024);assert(native.stats.antialias);
+     const keyboard=await page.evaluate(async()=>{
+      await pathosPrototype.enterOrbit();const mode=pathosPrototype.state.mode;
+      const {renderer,orbit,orbitCam}=pathosPrototype.debug,canvas=renderer.domElement;
+      canvas.focus({preventScroll:true});
+      const original=orbitCam.position.clone(),target=orbit.target.clone();
+      const press=key=>{const event=new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true});canvas.dispatchEvent(event);return event.defaultPrevented;};
+      const handled=press('ArrowLeft'),rotated=orbitCam.position.distanceTo(original)>1e-4;
+      press('ArrowRight');press('+');
+      for(let i=0;i<50;i++)press('+');const minimum=orbitCam.position.distanceTo(orbit.target);
+      for(let i=0;i<50;i++)press('-');const maximum=orbitCam.position.distanceTo(orbit.target);
+      press('+');const closer=orbitCam.position.distanceTo(orbit.target)<maximum;
+      for(let i=0;i<50;i++)press('ArrowUp');
+      let offset=orbitCam.position.clone().sub(orbit.target),phi=Math.acos(offset.y/offset.length());const above=phi>=orbit.minPolarAngle-1e-8;
+      for(let i=0;i<50;i++)press('ArrowDown');offset=orbitCam.position.clone().sub(orbit.target);phi=Math.acos(offset.y/offset.length());const below=phi<=orbit.maxPolarAngle+1e-8;
+      press('r');const reset=orbitCam.position.distanceTo(original)<1e-8&&orbit.target.distanceTo(target)<1e-8;
+      const tabFree=!press('Tab'),outside=new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true});document.body.dispatchEvent(outside);
+      press('Escape');const escaped=pathosPrototype.state.mode==='film'&&document.activeElement===document.getElementById('hw360');
+      canvas.focus({preventScroll:true});press('Enter');
+      document.getElementById('hwZoomIn').click();document.getElementById('hwZoomOut').click();
+      const focusable=canvas.tabIndex===0&&canvas.getAttribute('aria-hidden')==='false';
+      window.__hwLoss=renderer.getContext().getExtension('WEBGL_lose_context');window.__hwLoss.loseContext();
+      return {mode,handled,rotated,closer,minimum,maximum,minDistance:orbit.minDistance,maxDistance:orbit.maxDistance,above,below,reset,tabFree,outsideFree:!outside.defaultPrevented,escaped,entered:pathosPrototype.state.mode==='orbit',focusable};
+     });assert.equal(keyboard.mode,'orbit');
+     for(const key of ['handled','rotated','closer','above','below','reset','tabFree','outsideFree','escaped','entered','focusable'])assert(keyboard[key],`3D keyboard behavior: ${key}`);
+     assert(Math.abs(keyboard.minimum-keyboard.minDistance)<1e-8);assert(Math.abs(keyboard.maximum-keyboard.maxDistance)<1e-8);
+     await page.waitForFunction(()=>pathosPrototype.state.rendererMode==='guided');
+     assert.equal(await page.locator('#hwGuidedTab').getAttribute('aria-selected'),'true');
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),preserved);
+     assert.equal(await page.evaluate(()=>pathosPrototype.debug.renderer.domElement.tabIndex),-1,'Guided removes the hidden live canvas from the tab order');
+     await page.evaluate(()=>window.__hwLoss.restoreContext());await page.waitForTimeout(300);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.rendererMode),'guided','Context restoration must not override the fallback');
+     console.log(JSON.stringify({native:'manual Full HD rendering and context-loss fallback',gpu:native.stats.gpu,physicalDeviceBenchmark:false}));
+    }
    }
-   await page.evaluate(()=>scrollTo({top:pathosPrototype.scrollYForFrame(1360),behavior:'instant'}));
-   await page.waitForFunction(()=>Math.abs(pathosPrototype.state.target-1360)<2&&!pathosPrototype.state.rendering&&Math.abs(pathosPrototype.state.frame-pathosPrototype.state.target)<.1);
-   const before=await page.evaluate(()=>pathosPrototype.stats.frames);
-   await page.waitForTimeout(300);
-   const result=await page.evaluate(()=>{
-    const p=pathosPrototype,c=p.debug.renderer.domElement;
-    const poster=document.getElementById('hwPoster');
-    return {state:p.state,stats:p.stats,film:{width:p.film.w,height:p.film.h},poster:[poster.naturalWidth,poster.naturalHeight],buffer:[c.width,c.height],css:[c.clientWidth,c.clientHeight],dpr:devicePixelRatio,memory:performance.memory?.usedJSHeapSize,geometries:p.debug.renderer.info.memory.geometries,textures:p.debug.renderer.info.memory.textures};
-   });
-   assert.equal(result.state.seq,false);assert.equal(result.stats.model,'./assets/pathos-hardware.glb');assert.equal(result.stats.quality,1);
-   assert.equal(result.stats.shadow,2048);assert.equal(result.stats.frames,before,'Hardware draws must stop at rest');
-   assert.equal(result.buffer[0],Math.floor(result.css[0]*result.stats.pixelRatio));assert.equal(result.buffer[1],Math.floor(result.css[1]*result.stats.pixelRatio));
-   assert(result.stats.pixelRatio>=device.dpr,'HD floor cannot discard native retina pixels');
-   assert(result.buffer[0]*result.buffer[1]<=8*1024*1024,'HD hardware buffers stay within allocation budget');
-   assert(result.film.width*result.stats.pixelRatio>=1919.99&&result.film.height*result.stats.pixelRatio>=1079.99,'The actual Blender picture must be 1920 × 1080 or better on every tested layout');
-   assert(result.stats.picturePixels[0]>=1920&&result.stats.picturePixels[1]>=1080,'Reported physical film dimensions meet Full HD');
-   assert.equal(result.stats.antialias,true,'Rig edge antialiasing remains enabled on every tested layout');
-   assert.deepEqual(result.poster,[1920,1080],'Browser receives the sharp Full HD loading/fallback poster');
-   assert.equal(requests.filter(u=>u.includes('/hw-seq/')).length,0,'Native playback must not download film frames');
-   assert.equal(requests.filter(u=>u.includes('hardware-mobile.glb')).length,0);
-   await page.locator('#hwStage').screenshot({path:path.join(out,'pathos-hardware-hd-'+device.name+'.png')});
-   await page.locator('#hw360').click();
-   await page.waitForFunction(()=>pathosPrototype.state.mode==='orbit'&&!pathosPrototype.state.tweening&&!pathosPrototype.state.rendering);
-   const texturesBefore=result.textures;
-   await page.locator('#hwZoomIn').click();
-   await page.waitForFunction(()=>!pathosPrototype.state.rendering);
-   await page.locator('#hwExit360').click();
-   await page.waitForFunction(()=>pathosPrototype.state.mode==='film'&&!pathosPrototype.state.tweening&&!pathosPrototype.state.rendering);
-   const texturesAfter=await page.evaluate(()=>pathosPrototype.debug.renderer.info.memory.textures);
-   assert(texturesAfter<=texturesBefore+1,'Orbit must not accumulate textures');
-   assert.deepEqual(errors,[]);
-   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
-   await page.waitForFunction(()=>!pathosPrototype.state.visible);
-   const stopped=await page.evaluate(()=>pathosPrototype.stats.frames);await page.waitForTimeout(300);
-   assert.equal(await page.evaluate(()=>pathosPrototype.stats.frames),stopped,'No offscreen hardware renders');
-   assert(await page.evaluate(()=>pathosPrototype.stats.bufferPixels)<=Math.ceil(result.stats.pixelRatio)**2,'Offscreen render buffers must be released');
-   await page.evaluate(()=>scrollTo({top:pathosPrototype.scrollYForFrame(1360),behavior:'instant'}));
-   await page.waitForFunction(()=>pathosPrototype.state.visible&&pathosPrototype.stats.bufferPixels>10000&&!pathosPrototype.state.rendering);
-   assert.deepEqual(await page.evaluate(()=>[pathosPrototype.debug.renderer.domElement.width,pathosPrototype.debug.renderer.domElement.height]),result.buffer,'Return restores Full HD resolution');
-   console.log(JSON.stringify({device:device.name,readyMs,buffer:result.buffer,filmPixels:result.stats.picturePixels,poster:result.poster,antialias:result.stats.antialias,css:result.css,pixelRatio:result.stats.pixelRatio,geometries:result.geometries,textures:result.textures,heapMiB:Math.round(result.memory/1048576),gpu:result.stats.gpu,frames:result.stats.frames,errors,passed:'Full HD actual Blender picture and poster, antialiased rig edges, chapter seeking, original model, zero sequence downloads, 360/zoom/return, idle, offscreen release and return'}));
+   const geometry=await page.locator('#hwTrack').evaluate(el=>({track:el.offsetHeight,stage:document.getElementById('hwStage').offsetHeight}));
+   assert(Math.abs(geometry.track-geometry.stage)<2,'The player must not reserve a long scroll runway');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+   assert.equal(await page.locator('#hwHud .hw-chapter').count(),10,'Every original chapter is retained');assert.deepEqual(errors,[]);
+   console.log(JSON.stringify({device:device.name,passed:'Compact stage, bounded Guided, chapter/seek/play/pause and graceful fallback',physicalDeviceBenchmark:false}));
    await context.close();
   }
  }finally{await browser.close();}
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(error=>{console.error(error);process.exitCode=1;});
