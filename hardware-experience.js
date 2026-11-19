@@ -1,4 +1,4 @@
-// UI for the compact hardware player. Playback and rendering stay in prototype.js.
+// Adaptive controls for the cinematic hardware study. Rendering stays in prototype.js.
 const section=document.getElementById('prototype');
 if(section?.classList.contains('hw-experience')){
   const tabs=[...section.querySelectorAll('[data-hw-mode]')];
@@ -11,9 +11,24 @@ if(section?.classList.contains('hw-experience')){
   const start=document.getElementById('hwStart');
   const startText=document.getElementById('hwStartText');
   const note=document.getElementById('hwModeNote');
+  const view=document.getElementById('hwView');
+  const stage=document.getElementById('hwStage');
+  const hud=document.getElementById('hwHud');
   const chapters=[...section.querySelectorAll('.hw-chapter')];
   let current={rendererMode:'guided',playback:'paused',progress:0,chapter:0,frame:1,ready:false,loading3D:false};
-  let seeking=false,lastChapter=-1,lastNote='';
+  let seeking=false,lastChapter=-1,lastNote='',captionFrame=0;
+  function sizeCaption(){
+    if(captionFrame||!view||!stage||!hud)return;
+    captionFrame=requestAnimationFrame(()=>{
+      captionFrame=0;
+      const stacked=view.classList.contains('is-compact');
+      // The compact HUD uses one shared grid cell for all ten chapters.
+      // Invisible chapters still establish its stable intrinsic maximum.
+      const height=stacked?Math.ceil(hud.getBoundingClientRect().height):0;
+      stage.classList.toggle('has-stacked-hud',stacked);
+      stage.style.setProperty('--hw-caption-height',height+'px');
+    });
+  }
   const clamp=value=>Math.min(1,Math.max(0,Number(value)||0));
   const clock=seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
   const setText=(element,value)=>{if(element&&element.textContent!==value)element.textContent=value;};
@@ -96,5 +111,7 @@ if(section?.classList.contains('hw-experience')){
   seek?.addEventListener('blur',endSeek);
   document.addEventListener('pathos:hardwarestate',event=>sync(event.detail));
   document.addEventListener('pathos:hardwareready',()=>sync(window.pathosPrototype?.state));
+  if(hud&&view){const captionSizes=new ResizeObserver(sizeCaption);captionSizes.observe(hud);captionSizes.observe(view);}
   sync(window.pathosPrototype?.state||current);
+  sizeCaption();
 }

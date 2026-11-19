@@ -1,5 +1,23 @@
 # Pathos IoT design record
 
+## Cinematic hardware and Wispr reference adaptation
+
+The supplied Wispr Flow document is a visual reference, not a replacement brief.
+Its EB Garamond 400 display type, Figtree reading/UI type, flat 2px control edges,
+12px control corners, 32px existing panels and short 160–300ms motion are adapted
+to Pathos's existing palette. Primary actions use muted lilac with charcoal text;
+gold marks active states and hover. Cream paper and dark stone surfaces remain.
+The reference's forest/orange colors, page geometry and prohibition on 3D do not
+apply. Pill shapes remain for segmented tabs and badges. Display type avoids
+synthetic weight and uses readable multiline leading rather than compressed .85.
+
+Only the hardware study's presentation returns to a full-width cinematic player
+with the original shot titles over its picture. On smaller views, shot copy flows
+below the image. The adaptive policy and optional play, seek and scroll controls
+remain; no mandatory long scroll stage returns. Other section layouts and prior
+accessibility fixes are preserved. The portable social preview outlines the same
+EB Garamond and Figtree fonts used by the interface.
+
 ## Accessibility and adaptive hardware revision
 
 The external review was checked against the rendered current site by a council
@@ -26,8 +44,8 @@ pointer navigation does not focus whole sections. Reusable SVG controls replace
 decorative arrow characters in the interactive controls.
 
 Software screens and field photographs use direct controls instead of pinned
-scroll runs. The hardware player is a compact two-column section on wide screens
-and a natural stacked section on phones. Guided Visual and 3D Walkthrough tabs
+scroll runs. The hardware player used a compact two-column section on wide screens
+before the cinematic revision above. Guided Visual and 3D Walkthrough tabs
 sit above the picture, with explicit play, a timeline and all ten chapters.
 Guided starts first with a bounded pre-rendered cache. The existing samples
 contain a 1280 × 720 picture; native 3D retains its Full HD minimum. Auto-promotion
@@ -37,7 +55,7 @@ returns to Guided with truthful selected tabs. Manual choices invalidate pending
 automatic decisions. Checks stay in the browser and send no performance data.
 
 Both landing and standalone hardware pages share the generated player. The
-share image uses outlined Fraunces and Space Grotesk from the site's local
+share image uses outlined fonts from the site's local
 licensed files, so host font substitutions cannot change its appearance.
 
 Verification covers portrait, landscape, fallback, keyboard, reduced motion,

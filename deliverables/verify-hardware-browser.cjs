@@ -1,4 +1,4 @@
-// Browser regression for the actual compact Guided/3D study. Serve on :3000.
+// Browser regression for the cinematic Guided/3D study. Serve on :3000.
 // HW_QA_3D=1 adds a manual Full HD model/context-loss check (may be slow on software GL).
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
@@ -37,6 +37,18 @@ fs.mkdirSync(out,{recursive:true});
     assert.equal(await page.locator('#hwGuidedTab').getAttribute('aria-selected'),'true');
     assert(!requests.some(url=>url.includes('/pathos-hardware.glb')),'Guided must not fetch the 3D model');
     assert.equal(await page.locator('#hw360').isVisible(),false);
+    if(device.name==='mobile'){
+     await page.mouse.wheel(0,1);
+     for(const progress of [.1,.7]){
+      await page.evaluate(p=>scrollTo(0,pathosPrototype.scrollYForFrame(pathosPrototype.frameAt(p))),progress);
+      await page.waitForFunction(p=>Math.abs(pathosPrototype.state.progress-p)<.006,progress);
+      assert.equal(await page.evaluate(()=>pathosPrototype.state.playback),'scroll','The taller mobile stage still supports optional scroll playback');
+     }
+    }
+    if(device.reduced){
+     const beforeScroll=await page.evaluate(()=>pathosPrototype.state.frame);await page.mouse.wheel(0,25);await page.waitForTimeout(100);
+     assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),beforeScroll,'Reduced motion does not start automatic scroll playback');
+    }
     for(const index of [0,4,7,9]){
      await page.locator('#hwRail button').nth(index).click();
      await page.waitForFunction(i=>pathosPrototype.state.chapter===i,index);
@@ -44,6 +56,8 @@ fs.mkdirSync(out,{recursive:true});
     }
     await page.locator('#hwSeek').evaluate(el=>{el.value='250';el.dispatchEvent(new Event('input',{bubbles:true}));});
     await page.waitForFunction(()=>Math.abs(pathosPrototype.state.progress-.25)<.002);
+    const selectedFrame=await page.evaluate(()=>pathosPrototype.state.frame);await page.mouse.wheel(0,10);await page.waitForTimeout(100);
+    assert.equal(await page.evaluate(()=>pathosPrototype.state.frame),selectedFrame,'Manual timeline choices take precedence over subsequent page scrolling');
     await page.locator('#hwPlay').click();const before=await page.evaluate(()=>pathosPrototype.state.frame);
     await page.waitForFunction(frame=>pathosPrototype.state.frame>frame+5,before);
     await page.locator('#hwPlay').click();const paused=await page.evaluate(()=>pathosPrototype.state.frame);
@@ -124,11 +138,13 @@ fs.mkdirSync(out,{recursive:true});
      console.log(JSON.stringify({native:'manual Full HD rendering and context-loss fallback',gpu:native.stats.gpu,physicalDeviceBenchmark:false}));
     }
    }
-   const geometry=await page.locator('#hwTrack').evaluate(el=>({track:el.offsetHeight,stage:document.getElementById('hwStage').offsetHeight}));
+   const geometry=await page.locator('#hwTrack').evaluate(el=>({track:el.offsetHeight,stage:document.getElementById('hwStage').offsetHeight,width:document.getElementById('hwStage').getBoundingClientRect().width,viewport:innerWidth}));
    assert(Math.abs(geometry.track-geometry.stage)<2,'The player must not reserve a long scroll runway');
+   if(geometry.viewport>=1200)assert(geometry.width>=geometry.viewport*.8,'Desktop hardware must retain the full-width cinematic stage');
+   assert(await page.locator('#hwHud').evaluate(el=>!!el.closest('#hwView')),'Shot titles stay inside the cinematic view');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    assert.equal(await page.locator('#hwHud .hw-chapter').count(),10,'Every original chapter is retained');assert.deepEqual(errors,[]);
-   console.log(JSON.stringify({device:device.name,passed:'Compact stage, bounded Guided, chapter/seek/play/pause and graceful fallback',physicalDeviceBenchmark:false}));
+   console.log(JSON.stringify({device:device.name,passed:'Cinematic stage, bounded Guided, chapter/seek/play/pause and graceful fallback',physicalDeviceBenchmark:false}));
    await context.close();
   }
  }finally{await browser.close();}

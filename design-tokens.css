@@ -20,9 +20,9 @@
   --color-success:#326240;
   --color-rule:rgba(36,37,30,.18);
   --color-rule-dark:rgba(242,237,228,.22);
-  --font-ui:'Space Grotesk',Figtree,system-ui,sans-serif;
+  --font-ui:Figtree,system-ui,sans-serif;
   --font-reading:Figtree,system-ui,sans-serif;
-  --font-editorial:Fraunces,Georgia,serif;
+  --font-editorial:'EB Garamond',Georgia,serif;
   --font-body:var(--font-reading);
   --font-display:var(--font-ui);
   --font-serif:var(--font-editorial);
@@ -43,10 +43,10 @@
   --space-12:3rem;
   --space-16:4rem;
   --space-24:6rem;
-  --radius-control:.5rem;
-  --radius-panel:1.5rem;
+  --radius-control:.75rem;
+  --radius-panel:2rem;
   --radius-pill:999px;
-  --shadow-panel:0 .75rem 2rem rgba(16,16,14,.12);
+  --shadow-panel:none;
   --motion-fast:160ms;
   --motion-base:240ms;
   --motion-slow:300ms;

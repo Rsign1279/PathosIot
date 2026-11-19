@@ -51,8 +51,8 @@ for (const group of groups) {
   html=html.slice(0,start)+`<div class="planet-story" id="${group.id}" data-planet-story="${group.number}">\n${stage(group)}\n<div class="planet-content">\n${body}\n</div>\n</div>`+html.slice(end);
 }
 
-// The hardware study keeps its original chapters and model controls, in a
-// compact player that can be watched or scrubbed without a pinned scroll trap.
+// Restore the full-width cinematic study and its original in-picture titles,
+// while retaining optional playback instead of the old pinned scroll runway.
 const hardwareStart=html.indexOf('<section id="prototype"');
 const hardwareEnd=html.indexOf('</section>',hardwareStart)+'</section>'.length;
 if(hardwareStart<0||hardwareEnd<hardwareStart)throw new Error('Original hardware study missing');
@@ -60,14 +60,10 @@ let hardware=html.slice(hardwareStart,hardwareEnd);
 const originalHeader=/<header\b[^>]*prototype-head[^>]*>[^]*?<\/header>/.exec(hardware)?.[0];
 if(!originalHeader)throw new Error('Original hardware heading missing');
 let hardwareTrack=hardware.slice(hardware.indexOf('<div class="hw-track"'),hardware.lastIndexOf('</section>')).trim();
-const hudStart=hardwareTrack.indexOf('<div class="hw-hud"');
-const divs=/<\/?div\b[^>]*>/g;divs.lastIndex=hudStart;
-let depth=0,hudEnd=-1,token;
-while((token=divs.exec(hardwareTrack))){depth+=token[0].startsWith('</')?-1:1;if(depth===0){hudEnd=divs.lastIndex;break;}}
-if(hudStart<0||hudEnd<0)throw new Error('Original hardware chapter detail missing');
-let hardwareHud=hardwareTrack.slice(hudStart,hudEnd),chapterIndex=0;
-hardwareHud=hardwareHud.replace(/<article class="hw-chapter[^\"]*"/g,tag=>tag+` data-hw-current="${chapterIndex++===0}"`);
-hardwareTrack=hardwareTrack.slice(0,hudStart)+hardwareTrack.slice(hudEnd);
+if(!hardwareTrack.includes('id="hwHud"'))throw new Error('Original hardware chapter detail missing');
+let chapterIndex=0;
+hardwareTrack=hardwareTrack.replace(/<article class="hw-chapter[^\"]*"/g,tag=>tag+` data-hw-current="${chapterIndex++===0}"`);
+hardwareTrack=hardwareTrack.replace('id="hwHud" aria-live="polite"','id="hwHud" aria-live="off"');
 hardwareTrack=hardwareTrack.replace('<div class="hw-track" id="hwTrack">','<div class="hw-track" id="hwTrack" data-hw-compact="true">');
 hardwareTrack=hardwareTrack.replace('Loading the 3D model…','Preparing the guided visual…');
 hardwareTrack=hardwareTrack.replace('<nav class="hw-rail" id="hwRail" aria-label="Chapters"></nav>','');
@@ -78,9 +74,11 @@ hardware=`<section id="prototype" class="prototype hw-experience" aria-label="PA
   <div class="wrap hw-experience-shell">
     <div class="hw-experience-copy">
       ${hardwareHeading}
-      <button type="button" class="hw-start" id="hwStart"><span id="hwStartText">Start walkthrough</span><span aria-hidden="true">→</span></button>
-      <p class="hw-experience-invite">Want a closer look? Switch to <button type="button" id="hwExplore3D">3D Walkthrough</button>.</p>
-      <p class="hw-mode-note" id="hwModeNote" role="status" aria-live="polite">Guided visual is ready to explore.</p>
+      <div class="hw-experience-actions">
+        <button type="button" class="hw-start" id="hwStart"><span id="hwStartText">Start walkthrough</span><span aria-hidden="true">→</span></button>
+        <p class="hw-experience-invite">Want a closer look? Switch to <button type="button" id="hwExplore3D">3D Walkthrough</button>.</p>
+        <p class="hw-mode-note" id="hwModeNote" role="status" aria-live="polite">Guided visual is ready to explore.</p>
+      </div>
     </div>
     <div class="hw-experience-main">
       <div class="hw-mode-tabs" role="tablist" aria-label="Hardware viewing mode">
@@ -95,7 +93,6 @@ hardware=`<section id="prototype" class="prototype hw-experience" aria-label="PA
           <input type="range" class="hw-seek" id="hwSeek" min="0" max="1000" step="1" value="0" aria-valuetext="Start of the walkthrough">
           <output class="hw-time" id="hwTime" for="hwSeek">0:00 / 0:48</output>
         </div>
-        ${hardwareHud}
       </div>
       <nav class="hw-rail" id="hwRail" aria-label="Walkthrough chapters"></nav>
     </div>

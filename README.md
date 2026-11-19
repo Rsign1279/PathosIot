@@ -79,8 +79,10 @@ commit `6cfb566` so content preservation is directly auditable.
   hints can veto a probe; only a benchmark of the actual full-resolution scene
   can enable automatic 3D. Software rendering, reduced motion, coarse pointers,
   saving data, and uncertain performance keep Guided. No analytics are sent.
-- `hardware-experience.js` and `.css`: compact Guided Visual / 3D Walkthrough
-  tabs, explicit playback, timeline, and ten chapter controls. Manual input wins
+- `hardware-experience.js` and `.css`: full-width cinematic hardware presentation,
+  Guided Visual / 3D Walkthrough tabs, optional playback, timeline, and ten chapter
+  controls. Original shot titles overlay the desktop film and flow below the
+  picture on smaller views. Manual input wins
   over pending automatic decisions. Sustained lag or graphics loss returns to
   Guided at the same film position. Stale requests and a 45-second loading
   timeout cannot reactivate 3D. Both the landing and standalone hardware page
@@ -124,7 +126,7 @@ archived content baseline.
 To rebuild the brand assets, install `@resvg/resvg-js` outside this site in
 `../brand-tools`, and install Python `fonttools[woff]`. Then run
 `node deliverables/build-brand.cjs`. The social image outlines the same local
-Fraunces and Space Grotesk fonts used by the site, rather than relying on host
+EB Garamond and Figtree fonts used by the site, rather than relying on host
 fonts. These development dependencies are not shipped to visitors. Rebuild the integrated page with
 `node deliverables/build-integrated.cjs` and auxiliary page branding with
 `node deliverables/apply-brand.cjs`.

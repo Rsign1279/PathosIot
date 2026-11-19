@@ -125,11 +125,90 @@ async function verifyPlaybackAndStudyFocus(browser){
   }finally{await context.close();}
 }
 
+async function renderedFonts(page,selector){
+  const session=await page.context().newCDPSession(page);
+  try{
+    await session.send('DOM.enable');await session.send('CSS.enable');
+    const {root}=await session.send('DOM.getDocument');
+    const {nodeId}=await session.send('DOM.querySelector',{nodeId:root.nodeId,selector});
+    if(!nodeId)throw new Error(`Missing font inspection target: ${selector}`);
+    const {fonts}=await session.send('CSS.getPlatformFontsForNode',{nodeId});
+    return fonts.filter(font=>font.glyphCount>0).map(font=>({family:font.familyName,custom:font.isCustomFont,glyphs:font.glyphCount}));
+  }finally{await session.detach();}
+}
+
+async function verifyReferencePresentation(browser){
+  const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+  try{
+    await page.goto(base,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
+    const typography=[];
+    for(const [selector,family,weight] of [
+      ['#hero h1','EB Garamond','400'],
+      ['#proof .proof-n','EB Garamond','400'],
+      ['#hero .hero-cta .btn','Figtree','500'],
+      ['#contact .contact-form label','Figtree',null],
+      ['#hwPlay','Figtree',null]
+    ]){
+      const fonts=await renderedFonts(page,selector);
+      const style=await page.locator(selector).first().evaluate(el=>({family:getComputedStyle(el).fontFamily,weight:getComputedStyle(el).fontWeight}));
+      const expected=family.toLowerCase().replaceAll(' ','');
+      check(fonts.length>0&&fonts.every(font=>font.custom&&font.family.toLowerCase().replaceAll(' ','').includes(expected)),`${selector}: text is actually rendered with the chosen ${family} webfont`);
+      if(weight)check(style.weight===weight,`${selector}: the reference's display/control weight is respected`);
+      typography.push({selector,...style,rendered:fonts});
+    }
+    const palette=await page.evaluate(()=>{
+      const root=getComputedStyle(document.documentElement);
+      return Object.fromEntries(['--color-page','--color-dark','--color-accent','--color-lilac'].map(name=>[name,root.getPropertyValue(name).trim().toLowerCase()]));
+    });
+    const expectedPalette={'--color-page':'#f2ece2','--color-dark':'#10100e','--color-accent':'#e4c58f','--color-lilac':'#d5c2df'};
+    check(Object.entries(expectedPalette).every(([name,color])=>palette[name]===color),'Reference adaptation retains the established Pathos palette');
+    const controls=await page.locator('#hero .hero-cta .btn,#contact button[type="submit"],#hwPlay').evaluateAll(elements=>elements.map(el=>{
+      const style=getComputedStyle(el);return{text:el.textContent.trim(),border:style.borderTopWidth,radius:style.borderTopLeftRadius,shadow:style.boxShadow};
+    }));
+    check(controls.every(control=>control.border==='2px'&&control.radius==='12px'&&control.shadow==='none'),'Primary controls share the reference border, radius and flat treatment');
+    const panels=await page.locator('.device,.problem-chart,.how-scene,.press-strip .shot').evaluateAll(elements=>elements.map(el=>{
+      const style=getComputedStyle(el);return{className:el.className,radius:style.borderTopLeftRadius,shadow:style.boxShadow};
+    }));
+    check(panels.length>0&&panels.every(panel=>panel.radius==='32px'&&panel.shadow==='none'),'Existing framed panels use the flat rounded reference treatment');
+    // Test real computed form styling, including the older high-specificity
+    // marble selectors. An invalid empty submit never sends a message.
+    await page.route('**/formsubmit.co/**',route=>route.abort());
+    const fields=await page.locator('#contactName,#contactEmail,#contactOrg,#contactInterest,#contactMessage').evaluateAll(elements=>elements.map(el=>{
+      const style=getComputedStyle(el);return{id:el.id,widths:[style.borderTopWidth,style.borderRightWidth,style.borderBottomWidth,style.borderLeftWidth],radius:style.borderTopLeftRadius,border:style.borderTopColor,background:style.backgroundColor,repeat:style.backgroundRepeat};
+    }));
+    check(fields.every(field=>field.widths.every(width=>width==='2px')&&field.radius==='12px'),'Contact fields retain four visible 2px borders and 12px corners');
+    check(fields.every(field=>field.border==='rgb(203, 198, 184)'&&contrast(field.border,field.background)>=3),'Normal contact field borders remain visible against the dark background');
+    check(fields.find(field=>field.id==='contactInterest')?.repeat==='no-repeat','Restyled select keeps exactly one non-repeating arrow');
+    await page.locator('#contactForm').evaluate(form=>{form.reset();form.requestSubmit();});
+    await page.waitForFunction(()=>document.getElementById('contactName').getAttribute('aria-invalid')==='true');
+    const invalid=await page.locator('#contactName').evaluate(el=>{
+      const style=getComputedStyle(el);return{border:style.borderTopColor,background:style.backgroundColor,summary:document.getElementById('formStatus').textContent};
+    });
+    check(invalid.border==='rgb(255, 192, 205)'&&contrast(invalid.border,invalid.background)>=3,'Invalid contact fields have a distinct contrast-safe error border');
+    await page.locator('#contactName').fill('Design QA preview');
+    await page.locator('#contactName').evaluate(el=>el.blur());
+    const corrected=await page.locator('#contactName').evaluate(el=>({border:getComputedStyle(el).borderTopColor,invalid:el.getAttribute('aria-invalid'),summary:document.getElementById('formStatus').textContent}));
+    check(corrected.invalid!=='true'&&corrected.border==='rgb(203, 198, 184)'&&corrected.summary!==invalid.summary,'Correcting a field restores its normal border and updates the summary');
+    await page.locator('#hwView').scrollIntoViewIfNeeded();await page.waitForFunction(()=>window.pathosPrototype?.state.ready,undefined,{timeout:10000});
+    const cinematic=await page.locator('#hwView').evaluate(view=>{
+      const section=document.getElementById('prototype'),style=getComputedStyle(section);
+      const available=section.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+      return{width:view.getBoundingClientRect().width,available};
+    });
+    check(cinematic.width>=cinematic.available*.85,'The rig uses a broad cinematic presentation rather than a narrow sidebar card');
+    console.log(JSON.stringify({referencePresentation:{typography,palette,controls,panels,fields,invalid,corrected,cinematic}}));
+  }finally{await page.close();}
+}
+
 (async()=>{
   const browser=await chromium.launch({headless:true,
     executablePath:process.env.PATHOS_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),
     args:['--enable-unsafe-swiftshader']});
   try{
+    if(!process.env.PATHOS_QA_FOCUS_ONLY)await verifyReferencePresentation(browser);
+    if(process.env.PATHOS_QA_REFERENCE_ONLY){
+      console.log(JSON.stringify({failures}));assert.deepEqual(failures,[]);return;
+    }
     await verifyPlaybackAndStudyFocus(browser);
     if(process.env.PATHOS_QA_FOCUS_ONLY){
       console.log(JSON.stringify({failures}));assert.deepEqual(failures,[]);return;
@@ -193,7 +272,24 @@ async function verifyPlaybackAndStudyFocus(browser){
       check(await page.locator('#hw3DTab').evaluate(el=>document.activeElement===el),`${config.name}: keyboard arrows move between tabs`);
       check(await page.locator('#hwGuidedTab').getAttribute('aria-selected')==='true',`${config.name}: focus alone must not activate the expensive renderer`);
       const view=await page.locator('#hwView').boundingBox();
-      check(Math.abs(view.width/view.height-16/9)<.05,`${config.name}: guided fallback preserves the 16:9 picture without a tall black band`);
+      const film=await page.evaluate(()=>({width:window.pathosPrototype.film.w,height:window.pathosPrototype.film.h}));
+      check(Math.abs(film.width/film.height-16/9)<.05,`${config.name}: guided playback preserves the 16:9 film picture`);
+      check(film.width<=view.width+1&&film.height<=view.height+1,`${config.name}: the entire film picture fits without cropping`);
+      check(Math.abs(view.width/view.height-16/9)<.05,`${config.name}: the cinematic picture retains its film proportions`);
+      const chapter=await page.locator('#prototype .hw-chapter[data-hw-current="true"]').boundingBox();
+      const stage=view.width<880?await page.locator('#hwStage').boundingBox():view;
+      check(chapter&&chapter.x>=stage.x-1&&chapter.x+chapter.width<=stage.x+stage.width+1&&chapter.y>=stage.y-1&&chapter.y+chapter.height<=stage.y+stage.height+1,`${config.name}: the active shot details stay inside the cinematic stage`);
+      if(view.width<880)check(chapter&&chapter.y>=view.y+view.height-1,`${config.name}: readable shot details stay below the uncropped compact picture`);
+      if(view.width>=880){
+        const details=await page.locator('#prototype .hw-chapter[data-hw-current="true"] :is(.hw-eyebrow,.hw-title,.hw-caption,.hw-line,.hw-plate)').evaluateAll(elements=>elements
+          .filter(el=>{const style=getComputedStyle(el),box=el.getBoundingClientRect();return style.visibility!=='hidden'&&box.width>0&&box.height>0;})
+          .map(el=>{
+            let opacity=1;
+            for(let node=el;node&&node.id!=='hwStage';node=node.parentElement)opacity*=Number(getComputedStyle(node).opacity);
+            return{text:el.textContent.trim().slice(0,60),opacity};
+          }));
+        check(details.length>0&&details.every(detail=>detail.opacity>=.99),`${config.name}: paused desktop shot details are fully opaque through their ancestors`);
+      }
       await page.screenshot({path:path.join(output,`${config.name}-hardware.png`)});
       check(errors.length===0,`${config.name}: no uncaught browser errors`);
       console.log(JSON.stringify({config:config.name,...metrics,focus,darkFocus,errors}));

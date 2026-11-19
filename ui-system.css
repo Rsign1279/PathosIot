@@ -1,11 +1,12 @@
 /* Shared, accessible presentation over the preserved original experiences. */
 html{font-size:100%;scroll-padding-top:var(--nav-clearance);scroll-behavior:auto}
 body{font-family:var(--font-reading);font-size:var(--text-base);line-height:1.6}
+body,h1,h2,h3,p{font-synthesis:none}
 h2{overflow-wrap:anywhere}
 button,input,select,textarea{font:inherit}
 button,summary,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 :where(button,summary,.btn,.nav-link,.text-link,.planet-motion,.copy-btn){touch-action:manipulation}
-:is(.heading-1,.heading-2,.heading-3,.heading-4,.heading-5,.heading-6){font-family:var(--font-editorial);font-weight:400;line-height:1.12}
+:is(.heading-1,.heading-2,.heading-3,.heading-4,.heading-5,.heading-6){font-family:var(--font-editorial);font-weight:400;line-height:1.05;letter-spacing:-.03em}
 .heading-1{font-size:var(--text-hero)}
 .heading-2{font-size:var(--text-3xl)}
 .heading-3{font-size:var(--text-2xl)}
@@ -29,21 +30,22 @@ button,summary,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 :is(.btn,button:not(.sig-card):not(.how-step):not(.step-btn),summary,.nav-link,.text-link){transition:color var(--motion-fast) var(--ease),background-color var(--motion-fast) var(--ease),border-color var(--motion-fast) var(--ease),transform var(--motion-fast) var(--ease)}
 :is(.btn,button):active:not(:disabled){transform:translateY(1px)!important}
 :is(button,.btn):disabled{cursor:default;opacity:.5}
-.btn,.btn.button-md{font:500 var(--text-sm)/1.4 var(--font-ui);padding:.75rem 1.25rem;gap:.625rem;border-radius:var(--radius-pill)!important;box-shadow:none!important}
-.btn-dark{background:var(--color-ink);color:var(--color-on-dark)}
-.btn-dark:hover{background:var(--color-accent-ink)!important;color:var(--color-on-dark)}
-:is(#hero,#contact) .btn-dark{background:var(--color-on-dark);color:var(--color-dark)}
-:is(#hero,#contact) .btn-dark:hover{background:var(--color-accent)!important;color:var(--color-dark)}
+/* Wispr's flat editorial controls, using Pathos's established accent roles. */
+.btn,.btn.button-md,#hero .hero-cta .btn,#contact .contact--sys .btn-dark{font:500 var(--text-base)/1.3 var(--font-ui);padding:.875rem 1rem;gap:.75rem;border:2px solid var(--color-ink)!important;border-radius:var(--radius-control)!important;box-shadow:none!important;letter-spacing:0}
+.btn-dark,#hero .btn-dark,#contact .contact--sys .btn-dark{background:var(--color-lilac);color:var(--color-ink)}
+.btn-dark:hover,#hero .btn-dark:hover,#contact .contact--sys .btn-dark:hover{background:var(--color-accent)!important;color:var(--color-ink)}
 .copy-btn,.step-btn{border-radius:var(--radius-control);font-family:var(--font-ui)}
+/* Existing framed media adopts the reference's flat card finish. */
+:is(#device-tour .device,.planet-content .problem-chart,.planet-content .how-scene,.planet-content .press-strip .shot){border-radius:var(--radius-panel)!important;box-shadow:none!important}
 button svg,.btn svg,.text-link svg{stroke-width:1.75}
 .ui-icon{display:inline-block;vertical-align:middle;flex:0 0 auto;width:1.125rem;height:1.125rem}
 .feat-more{display:inline-flex;align-items:center;gap:.5rem}
 /* A compact header keeps a visible, labeled motion control at every width. */
 .nav{height:var(--nav-height);padding:0 var(--gutter);gap:var(--space-6);background:rgba(16,16,14,.98)!important}
 .nav .nav-link{display:inline-flex;align-items:center;justify-content:center;min-width:44px;font:500 var(--text-sm)/1.3 var(--font-ui);padding:.75rem 0;color:var(--color-on-dark-muted)}
-.nav .nav-link--cta{display:inline-flex;align-items:center;justify-content:center;min-height:var(--target-size);padding:.625rem 1rem;border:1px solid var(--color-on-dark)!important;border-radius:var(--radius-pill);background:var(--color-on-dark);color:var(--color-dark);text-decoration:none}
-.nav .nav-link--cta:hover{background:var(--color-accent)!important;border-color:var(--color-accent)!important;color:var(--color-dark)}
-.planet-motion{min-height:var(--target-size);padding:.5rem .625rem;gap:.375rem;border:1px solid var(--color-rule-dark);border-radius:var(--radius-pill);color:var(--color-on-dark-muted);font:500 var(--text-xs)/1.2 var(--font-ui)}
+.nav .nav-link--cta{display:inline-flex;align-items:center;justify-content:center;min-height:var(--target-size);padding:.625rem 1rem;border:2px solid var(--color-ink)!important;border-radius:var(--radius-control);background:var(--color-lilac);color:var(--color-ink);text-decoration:none}
+.nav .nav-link--cta:hover{background:var(--color-accent)!important;color:var(--color-ink)}
+.planet-motion{min-height:var(--target-size);padding:.5rem .625rem;gap:.375rem;border:2px solid var(--color-on-dark-muted);border-radius:var(--radius-control);color:var(--color-on-dark-muted);font:500 var(--text-xs)/1.2 var(--font-ui)}
 .planet-motion-label{display:inline!important}
 .planet-motion>span:first-child{display:flex}
 .planet-motion svg{width:1.1rem;height:1.1rem;display:block}
@@ -51,7 +53,7 @@ button svg,.btn svg,.text-link svg{stroke-width:1.75}
 /* The film remains visible, with a guaranteed dark floor beneath the type. */
 #hero.hero--film{padding:calc(var(--nav-height) + var(--space-16)) var(--gutter) var(--space-12);min-height:100svh;overflow:clip}
 #hero .hero-shade{background:linear-gradient(90deg,rgba(16,16,14,.82),rgba(16,16,14,.76)),linear-gradient(0deg,rgba(16,16,14,.3),transparent 60%)}
-#hero .hero-title{font-size:var(--text-hero);line-height:1.03!important;color:var(--color-on-dark);max-width:18ch;letter-spacing:-.045em!important}
+#hero .hero-title{font-family:var(--font-editorial);font-weight:400;font-size:var(--text-hero);line-height:.98!important;color:var(--color-on-dark);max-width:18ch;letter-spacing:-.03em!important}
 #hero .hero-title :is(.accent,.accent--mono){color:var(--color-accent);font-family:var(--font-editorial);font-size:1em}
 #hero .hero-sub{font-size:var(--text-lg);line-height:1.6;color:var(--color-on-dark);max-width:40rem}
 #hero .hero-research-status{font-size:var(--text-xs);color:var(--color-on-dark-muted);margin-top:var(--space-3)}
@@ -60,9 +62,11 @@ button svg,.btn svg,.text-link svg{stroke-width:1.75}
 #hero .hero-cta{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3)}
 #hero .logos{margin-top:var(--space-12);padding-top:var(--space-8);border-top-color:var(--color-rule-dark)}
 #hero .logos .logo--caps small{font-size:var(--text-xs);letter-spacing:.06em;line-height:1.4}
-/* Two licensed partner families are retained; these are names, not copied logos. */
+/* Editorial partner names use the same two families as the interface. */
+#hero .logos,#proof{--font-evidence-serif:var(--font-editorial);--font-evidence-sans:var(--font-ui)}
 #hero .logos .logo{font-size:var(--text-lg)!important;line-height:1.3;color:var(--color-on-dark-muted);font-weight:500;letter-spacing:-.025em}
 #hero .logos :is(.logo--serif,.logo--caps){font-size:1.375rem!important}
+#hero .logos :is(.logo--serif,.logo--caps),#proof :is(.proof-n,.proof-title){font-weight:400}
 #hero .logos .logo--heavy{font-size:1.5rem!important;font-weight:600}
 #hero .logos .logo--wide,#hero .logos .logo--light{font-size:1.25rem!important}
 #hero .logos .logo--mono{font-size:var(--text-base)!important}
@@ -108,7 +112,10 @@ button svg,.btn svg,.text-link svg{stroke-width:1.75}
 #contact .contact-info,#contact .contact-form{min-width:0}
 #contact .contact-email{display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 #contact .contact-form label{font-size:var(--text-sm)}
-#contact .form-group :is(input,select,textarea){font-size:var(--text-base);line-height:1.5;min-height:var(--target-size);padding-top:.75rem;padding-bottom:.75rem}
+#contact .marble--contact .form-group :is(input,select,textarea){font:400 var(--text-base)/1.5 var(--font-ui);min-height:var(--target-size);padding:.75rem 1rem;border:2px solid var(--color-on-dark-muted);border-radius:var(--radius-control);background-color:var(--color-dark);color:var(--color-on-dark);box-shadow:none}
+#contact .marble--contact .form-group select{padding-right:3rem;background-position:right 1rem center;background-repeat:no-repeat;background-size:12px 8px}
+#contact .marble--contact .form-group :is(input,select,textarea)[aria-invalid=true]{border-color:var(--color-error-dark)}
+#contact .marble--contact .copy-btn{border:2px solid var(--color-on-dark-muted);border-radius:var(--radius-control);box-shadow:none}
 #contact :is(.form-intro,.optional,.field-error,.form-status){font-size:var(--text-sm);line-height:1.6}
 #contact .field-error,#contact .form-status.error{color:var(--color-error-dark)}
 .site-foot{--gold:var(--color-accent);--muted:var(--color-on-dark-muted);color:var(--color-on-dark-muted)}
@@ -118,8 +125,8 @@ button svg,.btn svg,.text-link svg{stroke-width:1.75}
 .site-foot .foot-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:var(--space-8)}
 .site-foot .foot-grid>*{min-width:0}
 .site-foot .foot-tag{max-width:100%;overflow-wrap:anywhere}
-/* Short transitions join adjacent themes without adding tall decorative bands. */
-.proof{background:linear-gradient(180deg,#ded5c6 0,var(--color-page) 3rem)}
+/* Flat paper surfaces retain the original section geometry. */
+.proof{background:var(--color-page)}
 .film{padding-bottom:var(--space-12)}
 .planet-story+.prototype{border-top:1px solid var(--color-rule-dark)}
 @media(max-width:1100px){
