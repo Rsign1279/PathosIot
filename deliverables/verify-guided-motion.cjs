@@ -19,7 +19,10 @@ const base=process.env.PATHOS_QA_URL||'http://127.0.0.1:38741/';
     });
    }
    await page.goto(new URL('#prototype',base).href,{waitUntil:'load'});
+   await page.evaluate(()=>document.fonts.ready);
    await page.locator('#hwStage').scrollIntoViewIfNeeded();
+   // A real visitor's wheel input cancels the initial section-anchor correction.
+   await page.mouse.wheel(0,1);
    await page.waitForFunction(()=>window.pathosPrototype?.state.ready&&pathosPrototype.stats.guidedSource==='native-film',undefined,{timeout:30000});
    assert.deepEqual(await page.evaluate(()=>pathosPrototype.stats.guidedPixels),[1920,1080]);
    await page.evaluate(()=>scrollTo(0,pathosPrototype.scrollYForFrame(950)));
