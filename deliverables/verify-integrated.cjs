@@ -38,6 +38,8 @@ function stripEdge(html){return html.replace(/\s*<canvas\b(?=[^>]*\bclass=["'][^
 const normalizeBrand=html=>html.replace(/\bPathos%20IoT\b/g,'PATHOS').replace(/\bPathos IoT\b/g,'PATHOS');
 function normalizeMarkup(html,id){
   html=normalizeBrand(stripEdge(html));
+  // The founder interaction wraps the existing fallback photo without changing the biography.
+  if(id==='team')html=html.replace(/<figure class="founder-helmet">[\s\S]*?(<img class="founder-photo"[^>]*>)[\s\S]*?<\/figure>/,'$1');
   if(id==='hero')html=html.replace(/<span class="hero-research-status">[^]*?<\/span>/,'').replace('PATHOS explores skin conductance','PATHOS reads skin conductance');
   // The owner requested one film timeline: native controls replace this empty bar.
   if(id==='film')html=html.replace(/\s*<div class="film-scrub"[^>]*><span id="filmScrub"><\/span><\/div>/,'');
@@ -48,6 +50,7 @@ function normalizeMarkup(html,id){
 }
 function textContent(html,id){
   html=normalizeBrand(html);
+  if(id==='team')html=html.replace(/<figure class="founder-helmet">[\s\S]*?<\/figure>/,'');
   if(id==='hero')html=html.replace(/<span class="hero-research-status">[^]*?<\/span>/,'').replace('PATHOS explores skin conductance','PATHOS reads skin conductance');
   return html.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
 }
@@ -104,15 +107,15 @@ for(const id of ['hero','proof','film','device-tour','prototype','product','cont
 const sheets=[...current.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/g)].map(m=>attr(m[0],'href'));
 check(JSON.stringify(sheets)===JSON.stringify(['integrated.css']),'The integrated page must request one CSS bundle');
 const moduleSources=[...current.matchAll(/<script\b[^>]*src=["']([^"']+)["'][^>]*>/g)].map(m=>m[1]);
-const needed=['main.js','tilt.js','field.js','play.js','story.js','film.js','hero.js','prototype-loader.js','hardware-experience.js','integration.js'];
+const needed=['main.js','tilt.js','field.js','play.js','story.js','film.js','hero.js','prototype-loader.js','hardware-experience.js','integration.js','founder-helmet.js'];
 check(JSON.stringify(moduleSources)===JSON.stringify(needed),'Original functional modules plus the scoped integration and lazy hardware loader must remain');
 check(!/(?:src|href)=["'](?:\.\/)?experience\.(?:js|css)["']/.test(current),'Replacement-page experience modules must not load');
 const css=read('integrated.css');
 check(!/fonts\.(?:googleapis|gstatic)\.com/.test(current+css),'Integrated page must serve fonts locally');
-for(const file of ['integration.css','brand.css','design-tokens.css','ui-system.css','hardware-experience.css','compact-layout.css','media-controls.css'])check(css.includes(prepareStylesheet(read(file))),`The served bundle includes the current root-relative ${file}`);
+for(const file of ['integration.css','brand.css','design-tokens.css','ui-system.css','hardware-experience.css','compact-layout.css','media-controls.css','founder-helmet.css'])check(css.includes(prepareStylesheet(read(file))),`The served bundle includes the current root-relative ${file}`);
 check(!/(?:^|[;{])\s*font-size\s*:[^;}]*\dpx\b/m.test(css),'Compiled text sizes must respect root text settings');
 check(!/(?:^|[;{])\s*line-height\s*:[^;}]*\dpx\b/m.test(css),'Compiled text leading must grow with enlarged type');
-const changedScripts=['main.js','story.js','play.js','integration.js','orbit-motion.js','prototype-loader.js','planet.js','prototype.js','hardware-quality.js','hardware-adaptive.js','hardware-guided-film.js','hero.js','film.js','deliverables/build-integrated.cjs'];
+const changedScripts=['main.js','story.js','play.js','integration.js','orbit-motion.js','prototype-loader.js','planet.js','prototype.js','hardware-quality.js','hardware-adaptive.js','hardware-guided-film.js','hero.js','film.js','founder-helmet.js','deliverables/build-integrated.cjs'];
 for(const script of changedScripts){const result=spawnSync(process.execPath,['--check',path.join(root,script)],{encoding:'utf8'});check(result.status===0,`${script}: JavaScript syntax error ${result.stderr}`);}
 
 const pages=['index.html','hardware.html','privacy.html','404.html'];

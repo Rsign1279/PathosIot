@@ -96,11 +96,23 @@ const importerStart=html.indexOf('    <script type="module">',html.indexOf('src=
 const importerEnd=html.indexOf('</script>',importerStart)+9;
 if(importerStart<0)throw new Error('Original hardware importer missing');
 html=html.slice(0,importerStart)+'    <script type="module" src="prototype-loader.js"></script>\n    <script type="module" src="hardware-experience.js"></script>\n    <script type="module" src="integration.js"></script>\n    <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>'+html.slice(importerEnd);
+// The portfolio portrait is layered with a local render of the supplied helmet.
+html=html.replace(/<img class="founder-photo"[^>]*>/, photo=>`<figure class="founder-helmet">
+                    <div class="founder-helmet-stage">
+                        <picture>
+                            <source srcset="assets/founder/portrait.webp" type="image/webp">
+                            ${photo}
+                        </picture>
+                        <canvas aria-hidden="true"></canvas>
+                        <button type="button" class="founder-helmet-trigger" hidden><span>Reveal helmet</span></button>
+                    </div>
+                </figure>`);
+html=html.replace('    <script type="module" src="integration.js"></script>', '    <script type="module" src="integration.js"></script>\n    <script type="module" src="founder-helmet.js"></script>');
 html=applyBrand(html);
 fs.writeFileSync(path.join(root,'index.html'),html);
 require('./sync-hardware-page.cjs').syncHardwarePage(html);
 
-const sheets=['styles.css','prototype.css','field.css','play.css','story.css','system.css','film.css','flow.css','editorial.css','integration.css','brand.css','design-tokens.css','ui-system.css','compact-layout.css','hardware-experience.css','media-controls.css'];
+const sheets=['styles.css','prototype.css','field.css','play.css','story.css','system.css','film.css','flow.css','editorial.css','integration.css','brand.css','design-tokens.css','ui-system.css','compact-layout.css','hardware-experience.css','media-controls.css','founder-helmet.css'];
 const css=sheets.map(name=>`\n/* ${name} */\n`+prepareStylesheet(fs.readFileSync(path.join(root,name),'utf8'))).join('\n');
 fs.writeFileSync(path.join(root,'integrated.css'),css);
 console.log(`Restored all 19 original sections. Scoped the planet to ${groups.reduce((n,g)=>n+g.chapters.length,0)} requested sections in two passages. One CSS request; ${Buffer.byteLength(css)} bytes before compression.`);

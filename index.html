@@ -624,7 +624,16 @@
                 <p class="body-3 sec-tag">Student-built, end to end.</p>
             </header>
             <article class="founder founder--sys" data-reveal>
-                <img class="founder-photo" src="assets/rahul-viswanath.webp" alt="Rahul Viswanath, founder and CEO of Pathos IoT, in a grey suit and black tie." width="400" height="400" loading="lazy" decoding="async">
+                <figure class="founder-helmet">
+                    <div class="founder-helmet-stage">
+                        <picture>
+                            <source srcset="assets/founder/portrait.webp" type="image/webp">
+                            <img class="founder-photo" src="assets/rahul-viswanath.webp" alt="Rahul Viswanath, founder and CEO of Pathos IoT, in a grey suit and black tie." width="400" height="400" loading="lazy" decoding="async">
+                        </picture>
+                        <canvas aria-hidden="true"></canvas>
+                        <button type="button" class="founder-helmet-trigger" hidden><span>Reveal helmet</span></button>
+                    </div>
+                </figure>
                 <div class="founder-body">
                     <h3 class="heading-4">Rahul&nbsp;Viswanath</h3>
                     <p class="founder-role caption-2">Founder &amp; CEO, Pathos IoT</p>
@@ -771,6 +780,7 @@
     <script type="module" src="prototype-loader.js"></script>
     <script type="module" src="hardware-experience.js"></script>
     <script type="module" src="integration.js"></script>
+    <script type="module" src="founder-helmet.js"></script>
     <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>
 </body>
 </html>
