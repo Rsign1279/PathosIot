@@ -616,7 +616,7 @@
     </section>
 
     <!-- 5b. Trust: who is building it -->
-    <section id="team" class="section cv" data-planet-chapter="4" data-planet-title="Built by a person, for people" data-planet-note="The person behind the prototype.">
+    <section id="team" class="section cv" data-planet-finale data-planet-chapter="4" data-planet-title="Who’s building it" data-planet-note="The person behind the prototype.">
         <div class="wrap">
             <header class="sec-head sys-head" data-reveal>
                 <p class="eyebrow">Founder</p>
@@ -624,16 +624,7 @@
                 <p class="body-3 sec-tag">Student-built, end to end.</p>
             </header>
             <article class="founder founder--sys" data-reveal>
-                <figure class="founder-helmet">
-                    <div class="founder-helmet-stage">
-                        <picture>
-                            <source srcset="assets/founder/portrait.webp" type="image/webp">
-                            <img class="founder-photo" src="assets/rahul-viswanath.webp" alt="Rahul Viswanath, founder and CEO of Pathos IoT, in a grey suit and black tie." width="400" height="400" loading="lazy" decoding="async">
-                        </picture>
-                        <canvas aria-hidden="true"></canvas>
-                        <button type="button" class="founder-helmet-trigger" hidden><span>Reveal helmet</span></button>
-                    </div>
-                </figure>
+                <img class="founder-photo" src="assets/rahul-viswanath.webp" alt="Rahul Viswanath, founder and CEO of Pathos IoT, in a grey suit and black tie." width="400" height="400" loading="lazy" decoding="async">
                 <div class="founder-body">
                     <h3 class="heading-4">Rahul&nbsp;Viswanath</h3>
                     <p class="founder-role caption-2">Founder &amp; CEO, Pathos IoT</p>
@@ -653,9 +644,30 @@
             </article>
         </div>
     </section>
+</div>
+</div>
 
+    <section id="founder-portrait" class="founder-scene" aria-labelledby="founder-scene-title">
+        <div class="founder-scene-title">
+            <h2 id="founder-scene-title">Rahul<br>Viswanath</h2>
+        </div>
+        <figure class="founder-scene-art">
+            <img class="founder-scene-photo" src="assets/founder/portrait.webp" width="1280" height="1000" alt="Rahul Viswanath in a grey suit and black tie." loading="lazy" decoding="async">
+            <img class="founder-helmet-still" width="800" height="1000" alt="" aria-hidden="true">
+            <canvas aria-hidden="true" hidden></canvas>
+        </figure>
+        <div class="founder-scene-controls" hidden>
+            <p>Drag across the portrait</p>
+            <div class="founder-scene-scrub">
+                <span aria-hidden="true">Portrait</span>
+                <input type="range" min="0" max="100" value="0" aria-label="Helmet reveal" aria-valuetext="Portrait">
+                <span aria-hidden="true">Helmet</span>
+            </div>
+        </div>
+    </section>
+<div class="founder-after planet-content">
     <!-- 6. FAQs -->
-    <section id="faq" class="section faq" data-planet-chapter="5" data-planet-title="Good questions. Honest answers." data-planet-note="A little clarity before the next conversation.">
+    <section id="faq" class="section faq">
         <div class="wrap wrap--narrow">
             <header class="sec-head sys-head" data-reveal>
                 <p class="eyebrow">FAQ</p>
@@ -670,7 +682,6 @@
             </div>
         </div>
     </section>
-</div>
 </div>
 
     <!-- 7. Final call to action -->

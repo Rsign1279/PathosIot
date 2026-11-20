@@ -23,8 +23,7 @@ const groups = [
     ['roadmap','From here, forward','The work so far, and the questions ahead.'],
     ['workshops','Understanding is something we share','Teaching the pieces, one at a time.'],
     ['how','A minute to check in','Place. Verify. Observe.'],
-    ['team','Built by a person, for people','The person behind the prototype.'],
-    ['faq','Good questions. Honest answers.','A little clarity before the next conversation.']
+    ['team','Who’s building it','The person behind the prototype.']
   ]}
 ];
 const stage = group => `<aside class="planet-stage" aria-label="${group.label}">
@@ -44,7 +43,7 @@ for (const group of groups) {
   if (start < 0 || lastStart < start || end < lastStart) throw new Error(`Missing original chapter group ${group.id}`);
   let body = html.slice(start, end);
   group.chapters.forEach(([id,label,note],i)=>{
-    body=body.replace(new RegExp(`<section id="${id}"([^>]*)>`), `<section id="${id}"$1 data-planet-chapter="${i}" data-planet-title="${label}" data-planet-note="${note}">`);
+    body=body.replace(new RegExp(`<section id="${id}"([^>]*)>`), `<section id="${id}"$1${id==='team'?' data-planet-finale':''} data-planet-chapter="${i}" data-planet-title="${label}" data-planet-note="${note}">`);
   });
   // Only decorative margin art is replaced. Charts, signal traces and scenes remain.
   body = body.replace(/\s*<canvas class="edge-art"[^>]*><\/canvas>/g, '');
@@ -96,17 +95,30 @@ const importerStart=html.indexOf('    <script type="module">',html.indexOf('src=
 const importerEnd=html.indexOf('</script>',importerStart)+9;
 if(importerStart<0)throw new Error('Original hardware importer missing');
 html=html.slice(0,importerStart)+'    <script type="module" src="prototype-loader.js"></script>\n    <script type="module" src="hardware-experience.js"></script>\n    <script type="module" src="integration.js"></script>\n    <noscript><style>.planet-motion{display:none}.planet-story{display:block}.planet-stage{display:none}.planet-content{width:100%;max-width:1000px;margin:auto}.planet-content [data-reveal]{opacity:1;transform:none}</style></noscript>'+html.slice(importerEnd);
-// The portfolio portrait is layered with a local render of the supplied helmet.
-html=html.replace(/<img class="founder-photo"[^>]*>/, photo=>`<figure class="founder-helmet">
-                    <div class="founder-helmet-stage">
-                        <picture>
-                            <source srcset="assets/founder/portrait.webp" type="image/webp">
-                            ${photo}
-                        </picture>
-                        <canvas aria-hidden="true"></canvas>
-                        <button type="button" class="founder-helmet-trigger" hidden><span>Reveal helmet</span></button>
-                    </div>
-                </figure>`);
+// Give the portrait a full screen between the planet finale and the FAQ.
+const faqMarker='    <!-- 6. FAQs -->';
+const faqStart=html.indexOf(faqMarker);
+const faqEnd=html.indexOf('</section>',faqStart)+'</section>'.length;
+if(faqStart<0||faqEnd<faqStart)throw new Error('Original FAQ missing');
+const portraitScene=`    <section id="founder-portrait" class="founder-scene" aria-labelledby="founder-scene-title">
+        <div class="founder-scene-title">
+            <h2 id="founder-scene-title">Rahul<br>Viswanath</h2>
+        </div>
+        <figure class="founder-scene-art">
+            <img class="founder-scene-photo" src="assets/founder/portrait.webp" width="1280" height="1000" alt="Rahul Viswanath in a grey suit and black tie." loading="lazy" decoding="async">
+            <img class="founder-helmet-still" width="800" height="1000" alt="" aria-hidden="true">
+            <canvas aria-hidden="true" hidden></canvas>
+        </figure>
+        <div class="founder-scene-controls" hidden>
+            <p>Drag across the portrait</p>
+            <div class="founder-scene-scrub">
+                <span aria-hidden="true">Portrait</span>
+                <input type="range" min="0" max="100" value="0" aria-label="Helmet reveal" aria-valuetext="Portrait">
+                <span aria-hidden="true">Helmet</span>
+            </div>
+        </div>
+    </section>`;
+html=html.slice(0,faqStart)+portraitScene+'\n<div class="founder-after planet-content">\n'+html.slice(faqStart,faqEnd)+'\n</div>'+html.slice(faqEnd);
 html=html.replace('    <script type="module" src="integration.js"></script>', '    <script type="module" src="integration.js"></script>\n    <script type="module" src="founder-helmet.js"></script>');
 html=applyBrand(html);
 fs.writeFileSync(path.join(root,'index.html'),html);

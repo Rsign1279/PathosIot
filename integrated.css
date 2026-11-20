@@ -3598,100 +3598,147 @@ html:not(.js) #prototype .hw-view{position:relative;inset:auto;aspect-ratio:16/9
 
 
 /* founder-helmet.css */
-.planet-content #team .founder--sys {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  align-items: center;
-  gap: clamp(1.5rem, 3vw, 3rem);
+/* The founder biography is the last reading position of the planet. */
+.planet-content #team[data-planet-finale] {
+  min-height: calc(100svh - var(--nav-height) - var(--space-12));
 }
 
-.founder-helmet {
-  width: 100%;
-  max-width: 22rem;
-  min-width: 0;
-  margin: 0;
-}
-
-.founder-helmet-stage {
+.founder-scene {
+  --scene-height: calc(100svh - var(--nav-height));
+  --scene-paper: #edeee9;
   position: relative;
   isolation: isolate;
-  aspect-ratio: 4 / 5;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-panel);
-  background: radial-gradient(ellipse at 50% 34%, #2d271d 0%, #1c1a15 45%, #151512 77%);
+  min-height: max(18rem, var(--scene-height));
+  overflow: clip;
+  color: var(--color-ink);
+  background:
+    repeating-radial-gradient(ellipse at 110% 6%, transparent 0 5.9rem, #23342a0b 6rem 6.06rem, transparent 6.12rem 7.7rem),
+    radial-gradient(ellipse at 52% 34%, #fafaf6 4%, transparent 59%),
+    var(--scene-paper);
 }
 
-.planet-content #team .founder-helmet .founder-photo,
-.founder-helmet canvas {
+.founder-scene-title {
   position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  border-radius: var(--radius-panel) !important;
-  box-shadow: none;
+  z-index: 2;
+  left: var(--gutter);
+  top: 28%;
   pointer-events: none;
 }
 
-.founder-helmet-stage::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(transparent 71%, rgba(16, 16, 14, .68) 100%);
-  content: "";
-  pointer-events: none;
+.founder-scene-title h2 {
+  margin: 0;
+  font: 400 clamp(3rem, 6.5vw, 7.25rem)/.88 var(--font-editorial);
+  letter-spacing: -.055em;
 }
 
-.founder-helmet-trigger {
+.founder-scene-art {
   position: absolute;
   z-index: 1;
-  inset: 0;
-  display: grid;
-  align-content: end;
-  justify-items: center;
-  padding: .85rem .55rem;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: var(--color-accent);
-  cursor: pointer;
+  left: 50%;
+  bottom: 0;
+  width: min(76vw, calc(var(--scene-height) * 1.25), 86rem);
+  aspect-ratio: 1280 / 1000;
+  margin: 0;
+  transform: translateX(-50%);
   touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.founder-helmet-trigger[hidden] { display: none; }
-.founder-helmet-trigger:active { transform: none; }
+.founder-scene-art[data-interactive] { cursor: grab; }
+.founder-scene-art[data-dragging] { cursor: grabbing; }
 
-.founder-helmet-trigger span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.75rem;
-  padding: .45rem .95rem;
-  border: 1px solid rgba(228, 197, 143, .55);
-  border-radius: var(--radius-pill);
-  background: var(--color-dark);
+.founder-scene-art :is(img, canvas) {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  max-width: none;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.founder-scene-art .founder-helmet-still {
+  left: 18.75%;
+  width: 62.5%;
+  /* This layer is only shown if the browser cannot use the 3D scene. */
+  clip-path: inset(0 var(--helmet-clip, 100%) 0 0);
+  visibility: hidden;
+}
+
+.founder-scene-art[data-renderer="still"] .founder-helmet-still { visibility: visible; }
+
+.founder-scene-controls {
+  position: absolute;
+  z-index: 3;
+  inset: auto var(--gutter) max(1rem, env(safe-area-inset-bottom)) auto;
+  display: grid;
+  gap: .4rem;
+  width: min(19rem, calc(100% - 2 * var(--gutter)));
+  padding: .7rem .85rem;
+  border: 1px solid #17181323;
+  border-radius: var(--radius-control);
+  background: #f8f8f3f2;
+  color: var(--color-ink);
+}
+
+.founder-scene-controls[hidden] { display: none; }
+
+.founder-scene-controls p {
+  margin: 0;
   text-align: center;
-  font: 500 var(--text-sm)/1.3 var(--font-ui);
-  transition: background var(--motion-fast), color var(--motion-fast);
+  font: 500 var(--text-base)/1.25 var(--font-ui);
 }
 
-.founder-helmet-trigger:focus-visible span {
-  background: var(--color-accent);
-  color: var(--color-dark);
+.founder-scene-scrub {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .55rem;
+  color: var(--color-text);
+  font: 500 var(--text-xs)/1.2 var(--font-ui);
 }
 
-@media (hover: hover) {
-  .founder-helmet-trigger:hover span {
-    background: var(--color-accent);
-    color: var(--color-dark);
+.founder-scene-scrub input {
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  margin: 0;
+  cursor: ew-resize;
+  accent-color: #343d3a;
+}
+
+.founder-after {
+  --bg: var(--color-dark);
+  --ink: var(--color-on-dark);
+  --text: var(--color-on-dark-muted);
+  --muted: var(--color-on-dark-muted);
+  --gold: var(--color-accent);
+  --gold-light: var(--color-accent);
+  --line: var(--color-rule-dark);
+  --line-strong: var(--color-rule-dark);
+  --focus-color: var(--color-accent);
+  --focus-halo: var(--color-dark);
+  background: var(--color-dark);
+  padding-inline: var(--gutter);
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .founder-scene-title { top: 6%; }
+  .founder-scene-title h2 { font-size: min(16vw, clamp(3rem, 9vw, 5.625rem)); }
+  .founder-scene-art {
+    width: min(184vw, calc(var(--scene-height) * 1.04), 57rem);
   }
+  .founder-scene-controls { inset-inline: 0; margin-inline: auto; }
 }
 
-@media (max-width: 1100px) {
-  .planet-content #team .founder--sys { grid-template-columns: minmax(0, 1fr); }
-  .founder-helmet { max-width: 19rem; justify-self: center; }
+@media (max-height: 520px) and (orientation: landscape) {
+  .founder-scene-title { top: 22%; }
+  .founder-scene-title h2 { font-size: clamp(2.45rem, 6vw, 4rem); }
+  .founder-scene-controls { width: min(12rem, 30vw); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .founder-helmet-trigger span { transition: none; }
+@media (max-width: 640px) {
+  .planet-content #team[data-planet-finale] { min-height: calc(100svh - var(--nav-height) - 8rem); }
+  .founder-after > #faq { scroll-margin-top: var(--space-4); }
 }

@@ -12,7 +12,7 @@ const groups=[...document.querySelectorAll('[data-planet-story]')].map(element=>
     const unit={element:el,label,top:0,left:0,height:0,start:0,end:0,progress:-1,state:'',pinned:false,focused:false};
     el.classList.add('orbit-unit');unitMap.set(el,unit);return unit;
   });
-  return {element,stage,surface:element.querySelector('.planet-surface'),type:stage.querySelector('.orbit-type'),typeWords:stage.querySelector('.orbit-type-words'),emittedLabel:'',chapters:[...element.querySelectorAll('[data-planet-chapter]')],links:[...element.querySelectorAll('.planet-chapter-links a')],count:stage.querySelector('.planet-chapter-count'),title:stage.querySelector('.planet-chapter-title'),note:stage.querySelector('.planet-chapter-note'),bar:stage.querySelector('.orbit-progress span'),thread:stage.querySelector('.orbit-thread-path'),trace:stage.querySelector('.orbit-surface-trace'),source:stage.querySelector('.orbit-source'),units,bounds:[],top:0,bottom:0,index:-1,signal:.5,base:0,angle:-.45};
+  return {element,stage,surface:element.querySelector('.planet-surface'),type:stage.querySelector('.orbit-type'),typeWords:stage.querySelector('.orbit-type-words'),emittedLabel:'',chapters:[...element.querySelectorAll('[data-planet-chapter]')],links:[...element.querySelectorAll('.planet-chapter-links a')],count:stage.querySelector('.planet-chapter-count'),title:stage.querySelector('.planet-chapter-title'),note:stage.querySelector('.planet-chapter-note'),bar:stage.querySelector('.orbit-progress span'),thread:stage.querySelector('.orbit-thread-path'),trace:stage.querySelector('.orbit-surface-trace'),source:stage.querySelector('.orbit-source'),units,finale:element.querySelector('[data-planet-finale]'),bounds:[],top:0,bottom:0,index:-1,signal:.5,base:0,angle:-.45};
 });
 const motion=matchMedia('(prefers-reduced-motion:reduce)');
 const control=document.getElementById('planetMotion');
@@ -38,6 +38,10 @@ function measure(){
     group.top=box.top+scrollY;group.bottom=box.bottom+scrollY;group.left=stageBox.left;group.stageHeight=group.stage.offsetHeight;group.stickyTop=parseFloat(style.top)||0;group.padding=parseFloat(groupStyle.paddingTop)||0;group.paddingBottom=parseFloat(groupStyle.paddingBottom)||0;group.base=base;
     group.sphere={x:sphere.left+sphere.width/2-stageBox.left,y:sphere.top+sphere.height/2-stageBox.top,radius:group.surface.offsetWidth/2};
     group.bounds=group.chapters.map(chapter=>({top:layoutPosition(chapter).top,height:chapter.offsetHeight}));
+    // Finish the rotation as the last heading reaches its reading position.
+    group.stopAt=group.finale
+      ? layoutPosition(group.finale).top-group.stickyTop-(mobile?group.stageHeight+16:16)
+      : Infinity;
     for(const unit of group.units){
       const position=layoutPosition(unit.element);unit.top=position.top;unit.left=position.left;unit.height=unit.element.offsetHeight;
       unit.progress=-1;
@@ -87,15 +91,19 @@ function setPose(unit,p,pose){
   unit.element.dataset.orbitProgress=p.toFixed(3);unit.progress=p;
 }
 function updateGroup(group,y){
+  const atFinale=scroll>=group.stopAt;
   const focus=y+height*(mobile?.43:.38);
   let index=0;for(let i=0;i<group.bounds.length;i++)if(focus>=group.bounds[i].top)index=i;
+  if(atFinale)index=group.chapters.length-1;
   if(group.index!==index){
-    group.index=index;const chapter=group.chapters[index];group.count.textContent='0'+(index+1)+' / 06';group.title.textContent=chapter.dataset.planetTitle;group.note.textContent=chapter.dataset.planetNote;
+    group.index=index;const chapter=group.chapters[index];group.count.textContent=String(index+1).padStart(2,'0')+' / '+String(group.chapters.length).padStart(2,'0');group.title.textContent=chapter.dataset.planetTitle;group.note.textContent=chapter.dataset.planetNote;
     group.links.forEach((link,i)=>{if(i===index)link.setAttribute('aria-current','step');else link.removeAttribute('aria-current');});
   }
   const current=group.bounds[index],within=clamp((focus-current.top)/Math.max(1,current.height));
   if(group.bar)group.bar.style.transform='scaleX('+((index+within)/group.chapters.length)+')';
-  const angle=angleAt(scroll,group.top,group.base,rate);
+  const angle=angleAt(Math.min(scroll,group.stopAt),group.top,group.base,rate);
+  if(atFinale)group.element.dataset.orbitFinished='';
+  else delete group.element.dataset.orbitFinished;
   if(!paused)group.angle=angle;
   group.element.dataset.orbitAngle=group.angle.toFixed(5);
   group.stage.style.setProperty('--orbit-angle',(group.angle*.24)+'rad');
@@ -108,7 +116,7 @@ function updateGroup(group,y){
   for(const row of group.rows){
     let p=row.chunk.pinned?1:revealAt(angle,row.start,row.end);
     // A scrollbar jump must not project distant blocks into this viewport.
-    if(row.bottom<y||row.top-y<height*.48)p=1;
+    if(atFinale||row.bottom<y||row.top-y<height*.48)p=1;
     const pose=emergePose(p,group.left+source.x-row.left,stageTop+source.y-row.top,mobile);
     if(p>0&&p<1){
       // Protect previously delivered copy. The horizontal unrolling continues
