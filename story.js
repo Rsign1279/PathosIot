@@ -304,7 +304,13 @@ for (const d of document.querySelectorAll('.faq-item')) {
    at a stale position and stops short; this aims, checks where the target
    really landed, and corrects until it sits at the scroll padding. */
 
-const padTop = el => (parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0) + (innerWidth <= 640 && el?.closest('.planet-content') ? (el.closest('.planet-story').querySelector('.planet-stage').offsetHeight + 16) : 0);
+function padTop(element) {
+  const padding = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  const stage = innerWidth <= 640
+    ? element?.closest('.planet-content')?.closest('.planet-story')?.querySelector('.planet-stage')
+    : null;
+  return padding + (stage ? stage.offsetHeight + 16 : 0);
+}
 let aimRun = 0;
 function aimAt(el, smoothFirst, initial = false) {
   const run = ++aimRun;
