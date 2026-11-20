@@ -3,7 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-const brushCount = 10;
+// Fit the backing buffer around the helmet, including room to turn.
+const view = { left: .225, top: 0, width: .55, height: .72 };
 const asset = name => new URL(`./assets/founder/${name}`, import.meta.url).href;
 
 // The original helmet model stays aligned to the cutout. A mask on the
@@ -11,6 +12,11 @@ const asset = name => new URL(`./assets/founder/${name}`, import.meta.url).href;
 export async function createHelmetRenderer(canvas) {
   const renderer = new THREE.WebGLRenderer({
     canvas, alpha: true, antialias: true, powerPreference: 'low-power'
+  });
+  Object.assign(canvas.style, {
+    inset: `${view.top * 100}% auto auto ${view.left * 100}%`,
+    width: `${view.width * 100}%`,
+    height: `${view.height * 100}%`
   });
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.36;
@@ -23,7 +29,7 @@ export async function createHelmetRenderer(canvas) {
   scene.add(pivot);
 
   const decoder = new DRACOLoader().setDecoderPath(new URL('./assets/vendor/draco/', import.meta.url).href).setWorkerLimit(1);
-  let noise, environment;
+  let noise, environment, brushTexture;
   const dispose = () => {
     scene.traverse(object => {
       if (!object.isMesh) return;
@@ -32,6 +38,7 @@ export async function createHelmetRenderer(canvas) {
       object.geometry.dispose();
     });
     noise?.dispose();
+    brushTexture?.dispose();
     environment?.dispose();
     renderer.dispose();
   };
@@ -58,12 +65,61 @@ export async function createHelmetRenderer(canvas) {
     studio.dispose();
     pmrem.dispose();
 
+    // Rasterize the gesture once, on a small texture. The shader samples a
+    // continuous stroke instead of measuring every point for every fragment.
+    const brushCanvas = document.createElement('canvas');
+    brushCanvas.width = 320;
+    brushCanvas.height = 250;
+    const brushContext = brushCanvas.getContext('2d');
+    if (!brushContext) throw new Error('Helmet brush canvas unavailable');
+    brushContext.lineCap = 'round';
+    brushContext.strokeStyle = brushContext.fillStyle = '#fff';
+    brushTexture = new THREE.CanvasTexture(brushCanvas);
+    brushTexture.flipY = false;
+    brushTexture.generateMipmaps = false;
+    brushTexture.minFilter = THREE.LinearFilter;
     const uniforms = {
       uReveal: { value: 0 },
-      uBrush: { value: Array.from({ length: brushCount }, () => new THREE.Vector3()) },
+      uBrush: { value: brushTexture },
+      uBrushActive: { value: false },
+      uBrushBounds: { value: new THREE.Vector4() },
       uNoise: { value: noise },
-      uAspect: { value: 1.28 }
+      uView: { value: new THREE.Vector4(view.left, view.top, view.width, view.height) }
     };
+
+    function updateBrush(trail, time, duration) {
+      uniforms.uBrushActive.value = trail.length > 0;
+      if (!trail.length) return;
+      const { width, height } = brushCanvas;
+      brushContext.clearRect(0, 0, width, height);
+      let left = 1, top = 1, right = 0, bottom = 0;
+      for (let i = 0; i < trail.length; i++) {
+        const point = trail[i];
+        const from = trail[i - 1] || point;
+        const remaining = 1 - Math.max(0, (time - point.time) / duration);
+        const radius = .105 * Math.pow(remaining, .63) * height;
+        const x = point.x * width, y = point.y * height;
+        brushContext.globalAlpha = Math.min(1, remaining * 2.6);
+        brushContext.beginPath();
+        if (i === 0) {
+          brushContext.arc(x, y, radius, 0, Math.PI * 2);
+          brushContext.fill();
+        } else {
+          brushContext.lineWidth = radius * 2;
+          brushContext.moveTo(from.x * width, from.y * height);
+          brushContext.lineTo(x, y);
+          brushContext.stroke();
+        }
+        // Allow room for both the rounded edge and its shader distortion.
+        left = Math.min(left, point.x, from.x);
+        top = Math.min(top, point.y, from.y);
+        right = Math.max(right, point.x, from.x);
+        bottom = Math.max(bottom, point.y, from.y);
+      }
+      uniforms.uBrushBounds.value.set(left - .13, top - .15, right + .13, bottom + .15);
+      brushTexture.needsUpdate = true;
+    }
+
     const wireMaterial = new THREE.MeshBasicMaterial({
       color: 0x4a5554, wireframe: true, transparent: true, opacity: .075, depthWrite: false
     });
@@ -85,47 +141,58 @@ export async function createHelmetRenderer(canvas) {
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <common>', `#include <common>
             varying vec4 vHelmetClip;
-            uniform float uReveal, uAspect;
-            uniform sampler2D uNoise;
-            uniform vec3 uBrush[${brushCount}];`)
+            uniform float uReveal;
+            uniform bool uBrushActive;
+            uniform vec4 uView, uBrushBounds;
+            uniform sampler2D uNoise, uBrush;`)
           .replace('#include <alphamap_fragment>', `#include <alphamap_fragment>
-            vec2 uv = (vHelmetClip.xy / vHelmetClip.w + 1.0) * 0.5;
-            uv.y = 1.0 - uv.y;
-            float rough = texture2D(uNoise, uv * 2.8).r * .67
-                        + texture2D(uNoise, uv * 7.4).r * .33 - .5;
-            float sweep = (uv.x - .25) / .5 + (uv.y - .3) * .32 + rough * .23;
-            float coverage = uReveal >= .999 ? 1.0 : uReveal <= .001 ? 0.0
-                           : smoothstep(-.019, .009, uReveal * 1.22 - .11 - sweep);
-            for (int i=0; i<${brushCount}; i++) {
-              if (uBrush[i].z <= 0.0) continue;
-              vec2 delta = uv - uBrush[i].xy;
-              delta.x *= uAspect;
-              float edge = uBrush[i].z * (1.0 + rough * 1.65) - length(delta);
-              coverage = max(coverage, smoothstep(-.006, .004, edge));
-            }
-            if (coverage < .01) discard;
-            diffuseColor.a *= coverage;`);
+            if (uReveal < .999) {
+              vec2 uv = (vHelmetClip.xy / vHelmetClip.w + 1.0) * 0.5;
+              uv.y = 1.0 - uv.y;
+              uv = uv * uView.zw + uView.xy;
+              bool hasBrush = uBrushActive &&
+                all(greaterThanEqual(uv, uBrushBounds.xy)) &&
+                all(lessThanEqual(uv, uBrushBounds.zw));
+              if (uReveal <= .001 && !hasBrush) discard;
+              float coarse = texture2D(uNoise, uv * 2.8).r - .5;
+              float fine = texture2D(uNoise, uv * 7.4).r - .5;
+              float sweep = (uv.x - .25) / .5 + (uv.y - .3) * .32 + (coarse * .67 + fine * .33) * .23;
+              float coverage = uReveal <= .001 ? 0.0 :
+                smoothstep(-.019, .009, uReveal * 1.22 - .11 - sweep);
+              if (hasBrush && coverage < .999) {
+                vec2 warped = uv + vec2(coarse, fine) * .048;
+                float brush = texture2D(uBrush, clamp(warped, 0.0, 1.0)).a;
+                coverage = max(coverage, smoothstep(.02, .93, brush));
+              }
+              if (coverage < .01) discard;
+              diffuseColor.a *= coverage;
+            }`);
       };
     }
+
+    // Prepare both programs and upload textures before taking pointer input.
+    const textures = new Set([noise, brushTexture]);
+    for (const mesh of meshes) {
+      for (const value of Object.values(mesh.material)) if (value?.isTexture) textures.add(value);
+    }
+    for (const texture of textures) renderer.initTexture(texture);
+    await renderer.compileAsync(scene, camera);
 
     return {
       resize(width, height) {
         const ratio = Math.min(devicePixelRatio || 1, 1.75, Math.sqrt(1_600_000 / (width * height)));
         renderer.setPixelRatio(ratio);
-        renderer.setSize(width, height, false);
-        camera.aspect = uniforms.uAspect.value = width / height;
-        camera.updateProjectionMatrix();
+        renderer.setSize(width * view.width, height * view.height, false);
+        camera.setViewOffset(width, height, width * view.left, height * view.top,
+          width * view.width, height * view.height);
       },
-      draw(reveal, yaw, pitch, trail) {
+      draw(reveal, yaw, pitch, trail, time, trailDuration) {
         uniforms.uReveal.value = reveal;
+        wireMaterial.visible = reveal < .999;
         wireMaterial.opacity = .075 * (1 - reveal);
         pivot.rotation.set(pitch, yaw, 0);
-        for (let i = 0; i < brushCount; i++) {
-          const point = trail[i];
-          const brush = uniforms.uBrush.value[i];
-          if (point) brush.set(point.x, point.y, point.radius);
-          else brush.set(0, 0, 0);
-        }
+        for (const mesh of meshes) mesh.material.visible = reveal > .001 || trail.length > 0;
+        if (reveal < .999) updateBrush(trail, time, trailDuration);
         renderer.render(scene, camera);
       },
       dispose

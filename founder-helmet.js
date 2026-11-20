@@ -9,7 +9,8 @@ function setUpPortrait(section) {
   const controls = section.querySelector('.founder-scene-controls');
   const scrub = controls.querySelector('input');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const trailDuration = 620;
+  const trailDuration = 260;
+  const maxTrailPoints = 24;
   const clamp = (value, low = 0, high = 1) => Math.min(high, Math.max(low, value));
 
   let renderer;
@@ -19,12 +20,12 @@ function setUpPortrait(section) {
   let dragging = null;
   let pointer = null;
   let trail = [];
-  let amount = 0;
   let desired = 0;
   let yaw = 0;
   let pitch = 0;
   let frame = 0;
   let previousTime = 0;
+  let artRect;
 
   function requestDraw() {
     if (renderer && visible && !document.hidden && !frame) frame = requestAnimationFrame(draw);
@@ -33,27 +34,20 @@ function setUpPortrait(section) {
   function draw(time) {
     frame = 0;
     if (!visible || document.hidden || !renderer) return;
-    const ease = reduced.matches ? 1 : 1 - Math.exp(-Math.min(50, previousTime ? time - previousTime : 17) / 62);
+    const elapsed = previousTime ? time - previousTime : 17;
     previousTime = time;
     const aimYaw = pointer && !reduced.matches ? clamp((.5 - pointer.x) * .49, -.15, .15) : 0;
     const aimPitch = pointer && !reduced.matches ? clamp((pointer.y - .31) * .33, -.09, .09) : 0;
 
-    function settle(from, to) {
-      return Math.abs(from - to) < .001 ? to : from + (to - from) * ease;
-    }
+    // The pose and wipe follow the newest input on the next frame. Only
+    // releasing the pointer eases, so reversing direction has no catch-up.
+    const returnEase = 1 - Math.exp(-Math.min(50, elapsed) / 42);
+    yaw = pointer || Math.abs(yaw) < .001 ? aimYaw : yaw * (1 - returnEase);
+    pitch = pointer || Math.abs(pitch) < .001 ? aimPitch : pitch * (1 - returnEase);
+    while (trail.length && time - trail[0].time >= trailDuration) trail.shift();
+    renderer.draw(desired, yaw, pitch, trail, time, trailDuration);
 
-    amount = settle(amount, desired);
-    yaw = settle(yaw, aimYaw);
-    pitch = settle(pitch, aimPitch);
-    trail = trail.filter(point => time - point.time < trailDuration);
-    const brush = reduced.matches ? [] : trail.map(point => ({
-      x: point.x,
-      y: point.y,
-      radius: .128 * Math.pow(1 - clamp((time - point.time) / trailDuration), .72)
-    }));
-    renderer.draw(amount, yaw, pitch, brush);
-
-    if (amount !== desired || yaw !== aimYaw || pitch !== aimPitch || brush.length) requestDraw();
+    if (yaw !== aimYaw || pitch !== aimPitch || trail.length) requestDraw();
     else previousTime = 0;
   }
 
@@ -62,15 +56,16 @@ function setUpPortrait(section) {
     frame = previousTime = 0;
     pointer = null;
     trail = [];
-    amount = desired;
     yaw = pitch = 0;
     endDrag();
   }
 
   function setReveal(value) {
     desired = clamp(value);
-    scrub.value = String(Math.round(desired * 100));
-    scrub.setAttribute('aria-valuetext', desired === 0 ? 'Portrait' : desired === 1 ? 'Helmet' : `${scrub.value}% helmet`);
+    const percent = String(Math.round(desired * 100));
+    const label = desired === 0 ? 'Portrait' : desired === 1 ? 'Helmet' : `${percent}% helmet`;
+    if (scrub.value !== percent) scrub.value = percent;
+    if (scrub.getAttribute('aria-valuetext') !== label) scrub.setAttribute('aria-valuetext', label);
     if (art.dataset.renderer === 'still') {
       const edge = desired === 0 ? 100 : desired === 1 ? 0 : 84 - desired * 69;
       art.style.setProperty('--helmet-clip', `${edge}%`);
@@ -79,6 +74,7 @@ function setUpPortrait(section) {
   }
 
   function resize() {
+    artRect = null;
     if (!renderer || !art.clientWidth || !art.clientHeight) return;
     renderer.resize(art.clientWidth, art.clientHeight);
     requestDraw();
@@ -154,7 +150,7 @@ function setUpPortrait(section) {
       y: event.clientY,
       initial: desired,
       active: false,
-      rect: art.getBoundingClientRect()
+      rect: artRect = art.getBoundingClientRect()
     };
   });
   art.addEventListener('pointermove', event => {
@@ -163,7 +159,8 @@ function setUpPortrait(section) {
     if (drag) {
       const dx = event.clientX - drag.x;
       const dy = event.clientY - drag.y;
-      if (!drag.active && Math.hypot(dx, dy) > 8) {
+      const threshold = event.pointerType === 'touch' ? 8 : 2;
+      if (!drag.active && Math.hypot(dx, dy) > threshold) {
         if (event.pointerType === 'touch' && Math.abs(dy) >= Math.abs(dx)) {
           endDrag(event);
           return;
@@ -174,17 +171,24 @@ function setUpPortrait(section) {
       }
       if (drag.active) setReveal(drag.initial + dx / (drag.rect.width * .31));
     }
-    if (reduced.matches || (!drag?.active && event.pointerType !== 'mouse')) return;
-    const rect = drag?.rect || art.getBoundingClientRect();
-    pointer = {
-      x: clamp((event.clientX - rect.left) / rect.width),
-      y: clamp((event.clientY - rect.top) / rect.height)
-    };
-    const lastPoint = trail[0];
-    if (!lastPoint || Math.hypot(pointer.x - lastPoint.x, pointer.y - lastPoint.y) > .018) {
-      trail.unshift({ ...pointer, time: performance.now() });
-      trail.length = Math.min(trail.length, 10);
+    if (!renderer || reduced.matches || (!drag?.active && event.pointerType !== 'mouse')) return;
+    const rect = artRect ??= art.getBoundingClientRect();
+    if (!pointer) trail = [];
+    const now = performance.now();
+
+    function record(sample) {
+      pointer = {
+        x: clamp((sample.clientX - rect.left) / rect.width),
+        y: clamp((sample.clientY - rect.top) / rect.height)
+      };
+      const last = trail.at(-1);
+      if (last && Math.hypot(pointer.x - last.x, pointer.y - last.y) < .006) return;
+      trail.push({ ...pointer, time: now });
+      if (trail.length > maxTrailPoints) trail.shift();
     }
+
+    for (const sample of (event.getCoalescedEvents?.() ?? []).slice(-maxTrailPoints)) record(sample);
+    record(event);
     requestDraw();
   });
   art.addEventListener('pointerup', endDrag);
@@ -196,6 +200,9 @@ function setUpPortrait(section) {
     requestDraw();
   });
   art.addEventListener('dragstart', event => event.preventDefault());
+  const clearArtRect = () => { artRect = null; };
+  addEventListener('scroll', clearArtRect, { passive: true });
+  addEventListener('resize', clearArtRect, { passive: true });
 
   scrub.addEventListener('input', () => {
     pointer = null;
