@@ -61,7 +61,7 @@ commit `6cfb566` so content preservation is directly auditable.
   spacing, focus, touch targets, button states, and motion. Active layout
   boundaries are 640px, 900px and 1100px. Component-specific picture fitting
   remains separate from navigation behavior.
-- `compact-layout.css`: direct photo controls retain all six photographs;
+- `compact-layout.css`: the original scroll-driven photo deck retains all six photographs;
   the software tour keeps its restored pinned scroll track and four screens.
 - `integration.js`: one shared optional WebGL planet across two passages.
   One scroll-derived angle drives both its rotation and each original content
@@ -151,6 +151,7 @@ node deliverables/verify-brand.cjs
 node deliverables/verify-hardware.cjs
 node deliverables/verify-hardware-adaptive.cjs
 node deliverables/verify-scroll-restoration.cjs
+node deliverables/verify-field-scroll.cjs
 node deliverables/verify-hardware-film.cjs
 node deliverables/verify-guided-motion.cjs
 ```

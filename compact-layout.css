@@ -1,4 +1,4 @@
-/* Field photographs retain their direct controls. Software uses its original pinned scroll tour. */
+/* Field photographs use their original scroll-driven 3D deck. Software uses its original pinned scroll tour. */
 /* Preserve that tour's geometry while allowing enlarged text to reflow. */
 #device-tour .device-meta{min-width:0;grid-template-columns:minmax(0,1fr);max-width:100%}
 #device-tour .device-steps{max-width:100%;flex-wrap:wrap}
@@ -8,23 +8,15 @@
 #device-tour .device-caption{position:relative;grid-area:1/1;visibility:hidden}
 #device-tour .device-caption.is-on{visibility:visible}
 @media(max-width:640px){#device-tour .device-captions{min-height:96px}}
-#product.field.is-compact{padding-bottom:var(--space-16,4rem)}
-#product.field.is-compact .fl-track{height:auto}
-#product.field.is-compact .fl-stage{position:relative;top:auto;height:auto;min-height:0;width:min(100%,72rem);margin:0 auto;padding:var(--space-8,2rem) var(--gutter,1.5rem) 0;perspective:none;overflow:visible;cursor:auto;touch-action:pan-y pinch-zoom}
-#product.field.is-compact .fl-deck{--photo-height:clamp(16rem,55svh,34rem);position:relative;inset:auto;display:grid;place-items:center;height:var(--photo-height);list-style:none;margin:0;padding:0;pointer-events:auto;transform-style:flat}
-#product.field.is-compact .fl-card{position:relative;grid-area:1/1;inset:auto;left:auto;top:auto;width:100%;height:100%;margin:0;transform:none;transform-style:flat;will-change:auto;pointer-events:auto}
-#product.field.is-compact .fl-card[hidden]{display:none!important}
-#product.field.is-compact .fl-front.shot{position:relative;inset:auto;display:flex;justify-content:center;align-items:center;width:100%;height:100%;min-height:0;max-height:none;margin:0;padding:0;border:0;border-radius:var(--radius-panel,1.5rem);background:transparent;box-shadow:none;cursor:zoom-in;transform:none;overflow:hidden}
-#product.field.is-compact .fl-front.shot img{position:relative;inset:auto;width:min(100%,calc(var(--photo-height)*var(--photo-ratio,.8)));max-width:100%;height:auto;max-height:100%;aspect-ratio:auto;object-fit:contain;border-radius:var(--radius-panel,1.5rem)}
-#product.field.is-compact .fl-front.shot::after,#product.field.is-compact .fl-back{display:none}
-#product.field.is-compact .fl-ui{position:relative;inset:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-6,1.5rem);width:100%;margin:var(--space-6,1.5rem) auto 0;pointer-events:auto}
-#product.field.is-compact .fl-caption{min-height:7rem;max-width:46ch;animation:none}
-#product.field.is-compact .fl-caption strong{font-family:var(--font-ui,'Space Grotesk',sans-serif);font-size:var(--text-lg,1.125rem);line-height:1.35}
-#product.field.is-compact .fl-caption>span{font-size:var(--text-base,1rem);line-height:1.55}
-#product.field.is-compact .fl-nav{gap:8px;justify-content:center;max-width:100%}
-#product.field.is-compact .fl-count{min-width:0;flex:1 1 auto;font-size:var(--text-sm,.875rem)}
-#product.field.is-compact .fl-btn{display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px}
-@media(max-width:640px){
-  #product.field.is-compact .fl-ui{grid-template-columns:minmax(0,1fr);gap:var(--space-4,1rem)}
-  #product.field.is-compact .fl-nav{justify-content:space-between}
-}
+/* Preserve the original photo path while retaining the current brand controls. */
+#product.field.is-live .fl-stage{top:var(--nav-height,64px);height:calc(100svh - var(--nav-height,64px));min-height:0;touch-action:pan-y pinch-zoom}
+#product .fl-face{border-radius:var(--radius-panel,32px)}
+#product .fl-caption strong{font-family:var(--font-ui);font-size:var(--text-lg,1.125rem);line-height:1.35}
+#product .fl-caption>span{font-size:var(--text-base,1rem);line-height:1.55}
+#product .fl-back-n,#product .fl-count{font-family:var(--font-ui);font-size:var(--text-sm,.875rem)}
+#product .fl-back-t{font-family:var(--font-editorial);font-weight:400}
+#product .fl-back-d{font-size:var(--text-base,1rem)}
+#product .fl-btn{display:grid;place-items:center;flex:0 0 44px;border:2px solid var(--color-ink);background:var(--color-paper);color:var(--color-ink);transition:background var(--motion-fast),transform var(--motion-fast)}
+#product .fl-btn:hover{background:var(--color-page)}
+#product .fl-btn:active{transform:scale(.98)}
+@media(prefers-reduced-motion:reduce){#product .fl-caption.is-swap{animation:none}}

@@ -1,5 +1,14 @@
 # Pathos IoT design record
 
+## Original photo deck restored
+
+The build photographs again follow the scroll-driven U-shaped path from
+`6cfb566`: neighbouring cards bank, recede and flip to their marble backs.
+The original dwell curve, spring, sticky range and swipe motion are restored.
+Current brand typography, SVG controls and palette remain. Reduced motion
+keeps scroll-driven photo selection without banking or spring movement;
+rendering stops offscreen and in background tabs.
+
 ## Native guided film and decoded-frame motion
 
 Restoring the pinned layout did not address the guided renderer's quality:
